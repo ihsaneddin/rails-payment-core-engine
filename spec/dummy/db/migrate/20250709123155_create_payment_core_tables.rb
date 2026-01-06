@@ -1,0 +1,219 @@
+class CreatePaymentCoreTables < ActiveRecord::Migration[7.0]
+  def change
+
+    create_table :payment_core_billing_statements do |t|
+      t.references :customer, polymorphic: true, index: false
+      t.references :issuer, polymorphic: true, index: false
+      t.string :number
+      t.text :description
+      t.datetime :period_start
+      t.datetime :period_end
+      t.decimal :total_amount, precision: 15, scale: 2
+      t.string :currency
+      t.string :state
+      t.datetime :due_at
+      t.datetime :issued_at
+      t.string :entry_class
+      t.jsonb :metadata, default: {}
+      t.string :type
+      t.datetime :deleted_at
+      t.timestamps
+    end
+
+    add_index :payment_core_billing_statements, :number, unique: true
+    add_index :payment_core_billing_statements, :state
+    add_index :payment_core_billing_statements, :currency
+    add_index :payment_core_billing_statements, :deleted_at
+
+    add_index :payment_core_billing_statements, [:customer_type, :customer_id], name: :payment_billing_statements_customer
+    add_index :payment_core_billing_statements, [:issuer_type, :issuer_id], name: :payment_billing_statements_issuer
+
+    add_index :payment_core_billing_statements, :period_start
+    add_index :payment_core_billing_statements, :period_end
+    add_index :payment_core_billing_statements, :due_at
+    add_index :payment_core_billing_statements, :issued_at
+
+    create_table :payment_core_invoices do |t|
+      # Associations
+      t.references :customer, polymorphic: true, index: false
+      t.references :billable, polymorphic: true, index: false
+      t.references :billing_statement, index: false
+
+      # Identity & content
+      t.string     :number
+      t.text       :description
+
+      # Totals
+      t.decimal    :total_item_amount, precision: 12, scale: 2
+      t.decimal    :total_discount_amount, precision: 12, scale: 2
+      t.decimal    :total_exclusive_tax_amount, precision: 12, scale: 2
+      t.decimal    :total_inclusive_tax_amount, precision: 12, scale: 2
+      t.decimal    :total_amount, precision: 12, scale: 2
+      t.string     :currency
+
+      # STI support
+      t.string     :type
+
+      # Soft delete & timestamps
+      t.datetime   :deleted_at
+      t.timestamps
+    end
+
+    add_index :payment_core_invoices, :number, unique: true              # Fast lookup and ensures invoice number is unique
+    add_index :payment_core_invoices, :deleted_at                        # Soft-delete support
+    add_index :payment_core_invoices, [:customer_type, :customer_id, :deleted_at], name: "index_invoices_on_customer_and_deleted_at"
+    add_index :payment_core_invoices, [:billable_type, :billable_id, :deleted_at], name: "index_invoices_on_billable_and_deleted_at"
+    add_index :payment_core_invoices, [:billing_statement_id, :deleted_at], name: "index_invoices_on_billing_statement_and_deleted_at"
+
+    create_table :payment_core_invoice_items do |t|
+      t.references :invoice, index: false
+      t.string :number
+      t.text :description
+      t.decimal :total_item_amount, precision: 12, scale: 2
+      t.decimal :total_discount_amount, precision: 12, scale: 2
+      t.decimal :total_exclusive_tax_amount, precision: 12, scale: 2
+      t.decimal :total_inclusive_tax_amount, precision: 12, scale: 2
+      t.decimal :total_amount, precision: 12, scale: 2
+      t.string :currency
+      t.jsonb :metadata, default: {}
+      t.string :type
+      t.datetime :deleted_at
+      t.timestamps
+    end
+
+    add_index :payment_core_invoice_items, :number
+    add_index :payment_core_invoice_items, :currency
+    add_index :payment_core_invoice_items, :type
+    add_index :payment_core_invoice_items, :deleted_at
+    add_index :payment_core_invoice_items, [:invoice_id, :type]
+    add_index :payment_core_invoice_items, [:invoice_id, :deleted_at]
+
+    create_table :payment_core_payment_intents do |t|
+      t.references :payable, polymorphic: true, index: false
+
+      t.string     :gid                         # Global identifier
+      t.string     :reference_id                # External token or reference
+      t.decimal    :amount, precision: 15, scale: 2, default: 0
+      t.string     :currency
+
+      t.string     :state                       # e.g., created, pending, confirmed, failed
+      t.datetime   :expires_at
+      t.datetime   :confirmed_at
+      t.string     :confirmation_method         # manual, automatic, external
+
+      t.jsonb      :metadata, default: {}
+      t.string     :type                        # STI
+      t.datetime   :deleted_at
+
+      t.timestamps
+    end
+
+    add_index :payment_core_payment_intents, :gid, unique: true
+    add_index :payment_core_payment_intents, :reference_id
+    add_index :payment_core_payment_intents, :state
+    add_index :payment_core_payment_intents, :currency
+    add_index :payment_core_payment_intents, :confirmation_method
+    add_index :payment_core_payment_intents, :deleted_at
+    add_index :payment_core_payment_intents, [:payable_type, :payable_id], name: "payment_core_intents_payable"
+
+    create_table :payment_core_payment_methods do |t|
+      # Ownership
+      t.references :holder, polymorphic: true, index: false
+      t.references :reference, polymorphic: true, index: false
+
+      # Display & behavior
+      t.string   :number                 # e.g., last 4 digits
+      t.string   :display_name           # user-facing name
+      t.boolean  :use_reference          # if true, delegate behavior to reference
+
+      # Method identity
+      t.string   :method_type            # e.g., 'virtual_account', 'wallet', 'card'
+      t.string   :external_provider      # e.g., 'stripe', 'xendit', 'internal'
+      t.string   :setup_intent_id        # if created via external intent
+
+      # Lifecycle info
+      t.boolean  :default, default: false
+      t.boolean  :active, default: true
+      t.boolean  :always_available, default: true
+      t.datetime :expires_at
+      t.datetime :last_used_at
+      t.datetime :provisioned_at
+      t.datetime :last_failed_at
+      t.string   :failure_reason
+
+      # Metadata & deletion
+      t.string   :currency
+      t.jsonb    :metadata, default: {}
+      t.jsonb    :availability_rules, default: {}
+      t.datetime :deleted_at
+      t.integer  :entries_count
+
+      # STI support
+      t.string   :type
+
+      # Timestamps
+      t.timestamps
+    end
+
+    add_index :payment_core_payment_methods, :method_type
+    add_index :payment_core_payment_methods, :external_provider
+    add_index :payment_core_payment_methods, :deleted_at
+    add_index :payment_core_payment_methods, [:holder_type, :holder_id]
+    add_index :payment_core_payment_methods, [:reference_type, :reference_id], name: "payment_core_methods_reference"
+
+    create_table :payment_core_entries do |t|
+      # Relations
+      t.references :payment_intent, index: false
+      t.references :payment_method, index: false
+      t.references :payable, polymorphic: true, index: false
+      t.references :payer, polymorphic: true, index: false
+      t.references :paid_at, polymorphic: true, index: false
+      t.references :reference, polymorphic: true, index: false
+      t.references :parent, index: false
+
+      # Identifiers
+      t.string  :idempotency_key
+      t.datetime :idempotency_window
+      t.string  :number
+      t.text    :description
+      t.string  :payable_transaction_id
+      t.boolean :partial, default: false
+
+      # Amount
+      t.decimal :payment_method_amount, precision: 15, scale: 2, default: 0
+      t.decimal :amount, precision: 15, scale: 2, default: 0
+      t.string  :currency
+
+      # Status & Lifecycle
+      t.string   :direction
+      t.string   :state
+      t.datetime :will_expires_at
+      t.datetime :processed_at
+      t.datetime :succeeded_at
+      t.datetime :canceled_at
+      t.datetime :expired_at
+      t.datetime :failed_at
+      t.text     :failure_reason
+
+      # Extra
+      t.jsonb    :metadata, default: {}
+      t.string   :type
+      t.datetime :deleted_at
+      t.timestamps
+    end
+
+    # Indexes
+    add_index :payment_core_entries, :idempotency_key, unique: true
+    add_index :payment_core_entries, :state
+    add_index :payment_core_entries, :deleted_at
+
+    add_index :payment_core_entries, [:payment_method_id]
+    add_index :payment_core_entries, [:payment_intent_id]
+    add_index :payment_core_entries, [:payable_type, :payable_id]
+    add_index :payment_core_entries, [:payer_type, :payer_id]
+    add_index :payment_core_entries, [:reference_type, :reference_id]
+    add_index :payment_core_entries, [:paid_at_type, :paid_at_id]
+    add_index :payment_core_entries, [:parent_id]
+
+  end
+end
