@@ -44,7 +44,7 @@ class Order < OrderCore::Order
     state.present? && saved_change_to_state? && state == 'completed'
   end
 
-  publishes_event :completedd, on: :complete!, bus: :order
+  publishes_event :completed, on: :complete!, bus: :order
 
   payment_method_availability do |payment_method, context|
     line_items.any? do |line_item|

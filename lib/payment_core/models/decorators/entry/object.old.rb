@@ -140,7 +140,7 @@
 #               end
 #               ::PaymentCore::Models::Decorators::Entry::Object.register_class(subclass)
 #               ::PaymentCore.decorators.payable.payable_classes.each do |payable_class|
-#                 payable_class.define_payable_entry_subclass_relation(subclass)
+#                 payable_class.define_payable_entry_relation(subclass)
 #               end
 #               curr_entry_type = subclass.entry_type
 #               base_class.define_method("#{curr_entry_type}?".to_sym) do

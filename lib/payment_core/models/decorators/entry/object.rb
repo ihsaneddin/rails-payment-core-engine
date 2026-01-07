@@ -36,7 +36,9 @@ module PaymentCore
             base.include StateHooks
             base.extend ClassMethods
             base.include Hooks
+            base.extend Hooks::ClassMethods
             base.include RelationHooks
+            base.extend RelationHooks::ClassMethods
 
             base.eventable_bus_name = base.name.demodulize.underscore.to_sym
 
@@ -49,6 +51,7 @@ module PaymentCore
               register_state_events
               register_state_method_helpers
               define_payment_method_relations
+              define_payment_intent_relations
             end
 
 
@@ -74,6 +77,7 @@ module PaymentCore
               include ::Plugins::Models::Concerns::TracksTransactionRoot
               include ::Plugins.decorators.inheritables.class_attributes
               include ::Plugins.decorators.hooks
+              extend ::PaymentCore::Models::Decorators::Core
             end
           end
 
@@ -268,6 +272,7 @@ module PaymentCore
               with_options if: proc {|record| !record.partial && record.payable } do
                 validate do
                   if amount < payable.payable_unpaid_amount
+                    debugger
                     errors.add(:amount, :invalid)
                   end
                 end
@@ -279,13 +284,15 @@ module PaymentCore
                   end
                 end
               end
+            end
 
-              def self.inherited(subclass)
+            module ClassMethods
+              def inherited(subclass)
                 super(subclass)
                 subclass.entry_type= subclass.name.demodulize.underscore
-                after_class_defined(subclass) do
-                  ::PaymentCore::Models::Decorators::Entry::Object << subclass
-                end
+                ::PaymentCore::Models::Decorators::Entry::Object << subclass
+                # after_class_defined(subclass) do
+                # end
               end
             end
           end
@@ -298,11 +305,9 @@ module PaymentCore
               acts_as_paranoid if ::PaymentCore.config.soft_delete_enabled
 
               if paranoid?
-                #belongs_to :payment_intent, -> { with_deleted }, class_name: "PaymentCore::PaymentIntent", foreign_key: 'payment_intent_id', optional: true
                 belongs_to :parent, -> { with_deleted }, class_name: 'PaymentCore::Entry', foreign_key: 'parent_id', optional: true
                 has_many :components, -> { with_deleted }, class_name: 'PaymentCore::Entry', foreign_key: 'parent_id', dependent: :destroy
               else
-                #belongs_to :payment_intent, class_name: "PaymentCore::PaymentIntent", foreign_key: 'payment_intent_id', optional: true
                 belongs_to :parent, class_name: 'PaymentCore::Entry', foreign_key: 'parent_id', optional: true
                 has_many :components, class_name: 'PaymentCore::Entry', foreign_key: 'parent_id', dependent: :destroy
               end
@@ -313,32 +318,35 @@ module PaymentCore
 
               accepts_nested_attributes_for :components, reject_if: :all_blank
 
-              extend ClassMethods
+            end
 
-              module ClassMethods
-                def inherited subclass
-                  super(subclass)
-                  after_class_defined(subclass) do
-                    ::PaymentCore.decorators.payable.payable_classes.each do |payable_class|
-                      payable_class.define_payable_entry_subclass_relation(subclass)
+            module ClassMethods
+              def inherited subclass
+                super(subclass)
+                after_class_defined(subclass) do
+                  ::PaymentCore.decorators.payable.payable_classes.each do |payable_class|
+                    payable_class.payable_setup do
+                      define_payable_entry_relation(subclass)
                     end
-                    ::PaymentCore::Models::Decorators::PaymentMethod::Object.registered_classes.each do |klass|
-                      klass.setup do
-                        define_entry_relation(subclass)
-                      end
+                  end
+                  ::PaymentCore::Models::Decorators::PaymentMethod::Object.registered_classes.each do |klass|
+                    klass.setup do
+                      define_entry_relation(subclass)
                     end
-                    # ::PaymentCore::Models::Decorators::Payable.registered_classes.each do |klass|
-                    #   klass.payable_setup do
-                    #     define_payable_entry_relation(subclass)
-                    #   end
-                    # end
+                  end
+                  ::PaymentCore::Models::Decorators::PaymentIntent::Object.registered_classes.each do |klass|
+                    klass.setup do
+                      define_entry_relation(subclass)
+                    end
+                  end
+                  ::PaymentCore::Models::Decorators::PaymentMethodHolder.registered_classes.each do |klass|
+                    klass.payment_method_holder_setup do
+                      define_payment_method_holder_entry_relation(subclass)
+                    end
                   end
                 end
               end
 
-            end
-
-            class_methods do
               def entry_relation_name_on_payment_method
                 if self == base_class
                   :entries
@@ -363,6 +371,14 @@ module PaymentCore
                 end
               end
 
+              def entry_relation_name_on_holder
+                if self == base_class
+                  :payment_entries
+                else
+                  "payment_#{name.demodulize.underscore}_entries".to_sym
+                end
+              end
+
               private
 
               def define_payment_method_relations
@@ -381,6 +397,24 @@ module PaymentCore
                   end
                 end
               end
+
+              def define_payment_intent_relations
+                ::PaymentCore::Models::Decorators::PaymentIntent::Object.registered_classes.each do |klass|
+                  define_payment_intent_relation(klass)
+                end
+              end
+
+              def define_payment_intent_relation(klass= ::PaymentCore::PaymentIntent)
+                assoc_name = klass.payment_intent_relation_name_on_entry
+                unless reflect_on_association(assoc_name)
+                  if paranoid?
+                    belongs_to assoc_name, -> { with_deleted }, class_name: klass.name, foreign_key: 'payment_intent_id', optional: true
+                  else
+                    belongs_to assoc_name, class_name: klass.name, foreign_key: 'payment_intent_id', optional: true
+                  end
+                end
+              end
+
             end
 
           end

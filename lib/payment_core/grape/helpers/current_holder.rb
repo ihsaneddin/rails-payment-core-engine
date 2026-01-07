@@ -14,7 +14,7 @@ module PaymentCore
           end
 
           def holder_class
-            ::PaymentCore.decorators.payment_method_holder.holder_classes.find{|klass| klass.payment_method_holder_api.type == holder_type } ||
+            ::PaymentCore.decorators.payment_method_holder.registered_classes.find{|klass| klass.payment_method_holder_api.type == holder_type } ||
             raise { ::ActiveRecord::RecordNotFound }
           end
 

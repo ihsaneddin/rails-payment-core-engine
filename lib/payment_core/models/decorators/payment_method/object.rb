@@ -31,7 +31,9 @@ module PaymentCore
              base.include DepedencyHooks
              base.extend ClassMethods
              base.include RelationHooks
+             base.extend RelationHooks::ClassMethods
              base.include Hooks
+             base.extend Hooks::ClassMethods
 
              base.inheritable_class_attribute :method_type, :allowed_entry_types, :direction, :requires_payable
              base.method_type = base.name.demodulize.underscore
@@ -63,6 +65,8 @@ module PaymentCore
               include ::Plugins.decorators.method_decorators
               include ::Plugins.decorators.inheritables.singleton_methods
               include ::Plugins.decorators.hooks
+              include ::Plugins::EngineCallbacks
+              extend ::PaymentCore::Models::Decorators::Core
             end
           end
 
@@ -166,8 +170,29 @@ module PaymentCore
                 entry.payment_method.update_column(:last_used_at, DateTime.now) if entry.payment_method
               end
 
-              def self.inherited(subclass)
-                debugger
+              after_payment_core_initialization do
+                default_payment_methods_builder = ::PaymentCore.config.payment_method.default_payment_methods_builder
+                if default_payment_methods_builder && default_payment_methods_builder.is_a?(Proc)
+                  if ::ActiveRecord::Base.connection.table_exists?('payment_core_payment_methods')
+                    instance_exec(&default_payment_methods_builder)
+                  end
+                end
+              end
+              grape_api_resource "payment_core", default: true do
+                query_scope do |query_scope, api|
+                  api.current_holder.payment_method_candidates
+                end
+                resource_params_attributes do
+                  [
+                    :label_name, :active
+                  ]
+                end
+                presenter "PaymentCore::Grape::Presenters::PaymentMethod"
+              end
+
+            end
+            module ClassMethods
+              def inherited(subclass)
                 super(subclass)
                 subclass.method_type= subclass.name.demodulize.underscore
                 after_class_defined(subclass) do
@@ -192,28 +217,25 @@ module PaymentCore
               scope :global, -> { where(holder: nil) }
               scope :always_available, -> { where(always_available: true) }
 
-              extend ClassMethods
-
-              module ClassMethods
-                def inherited(subclass)
-                  super(subclass)
-                  after_class_defined(subclass) do
-                    ::PaymentCore::Models::Decorators::Entry::Object.registered_classes.each do |klass|
-                      klass.setup do
-                        define_payment_method_relation(subclass)
-                      end
-                    end
-                    # ::PaymentCore::Models::Decorators::PaymentMethodHolder.registered_classes.each do |klass|
-                    #   klass.payment_holder_setup do
-                    #     define_payment_method_relation(subclass)
-                    #   end
-                    # end
-                  end
-                end
-              end
             end
 
-            class_methods do
+            module ClassMethods
+              def inherited(subclass)
+                super(subclass)
+                after_class_defined(subclass) do
+                  ::PaymentCore::Models::Decorators::Entry::Object.registered_classes.each do |klass|
+                    klass.setup do
+                      define_payment_method_relation(subclass)
+                    end
+                  end
+                  # ::PaymentCore::Models::Decorators::PaymentMethodHolder.registered_classes.each do |klass|
+                  #   klass.payment_holder_setup do
+                  #     define_payment_method_relation(subclass)
+                  #   end
+                  # end
+                end
+              end
+
               def payment_method_relation_name_on_holder
                 if self == base_class
                   :payment_methods
@@ -223,6 +245,14 @@ module PaymentCore
               end
 
               def payment_method_relation_name_on_entry
+                if self == base_class
+                  :payment_method
+                else
+                  "payment_method_#{self.name.demodulize.underscore}".to_sym
+                end
+              end
+
+              def payment_method_relation_name_on_reference
                 if self == base_class
                   :payment_method
                 else
@@ -254,7 +284,7 @@ module PaymentCore
           module InstanceMethods
 
             def method_missing(method_name, *args, &block)
-              registered_types = ::PaymentCore::Models::Decorators::Payment::Object.registered_method_types.to_a.map{|type| "#{type}?" }
+              registered_types = ::PaymentCore::Models::Decorators::PaymentMethod::Object.registered_method_types.to_a.map{|type| "#{type}?" }
               if method_name.to_s.chomp("?") && registered_types.include?(method_name.to_s)
                 if method_name.to_s == "kind_of_#{self.class.method_type}?"
                    self.class.super_class.method_type.to_s == self.class.method_type
