@@ -6,6 +6,13 @@ module PaymentCore
 
           include ::Plugins.decorators.traits
 
+          STATES = {
+            pending: "pending",
+            expired: "expired",
+            confirmed: "confirmed",
+            canceled: "canceled"
+          }
+
           def invalid_class?(base)
             unless base.include?(::PaymentCore::Models::Decorators::PaymentIntent::Object)
               raise "Invalid : #{base.name} does not include #{::PaymentCore::Models::Decorators::PaymentIntent::Object} module"
@@ -38,8 +45,10 @@ module PaymentCore
 
             base.setup do
               register_cycle_events
-              register_state_events
               define_entry_relations
+              define_enum_states(STATES)
+              register_state_events
+              register_state_method_helpers
             end
 
             base.include InstanceMethods
@@ -79,6 +88,10 @@ module PaymentCore
               custom_attributes_definition :metadata, klass, accessor: true
             end
 
+            def define_enum_states(list_of_states = {})
+              enum state: list_of_states
+            end
+
             def register_state_events
               after_commit do
                 if state.present? && state != state_before_last_save
@@ -99,10 +112,45 @@ module PaymentCore
               end
             end
 
+            def register_state_method_helpers
+              states.each do |k,v|
+                define_method "after_state_#{k}?" do
+                  saved_change_to_state? && state == k
+                end
+
+                define_method "state_will_be_#{k}?" do
+                  will_save_change_to_state? && state == k
+                end
+              end
+            end
+
+
           end
 
           module Hooks
             extend ActiveSupport::Concern
+
+            included do
+
+              scope :expires_on_date, ->(date) { where.not(expires_at: nil).where("DATE(expires_at) = ?", date) }
+
+              before_save do
+                if state_will_be_confirmed?
+                  self.confirmed_at = Time.current
+                end
+              end
+            end
+
+            def schedule_for_expiration
+              if expires_at && pending
+                if expires_at.past?
+                  PaymentCore::PaymentIntentWorker.perform_at(Time.current + 5.seconds, id, 'expiry')
+                else
+                  PaymentCore::PaymentIntentWorker.perform_at(expires_at, id, 'expiry')
+                end
+              end
+            end
+
             module ClassMethods
               def inherited(subclass)
                 super(subclass)
@@ -151,9 +199,9 @@ module PaymentCore
 
               def payment_intent_relation_name_on_payable
                 if self == base_class
-                  :payment_intents
+                  :payable_payment_intents
                 else
-                  "payment_intent_#{name.demodulize.underscore.pluralize}".to_sym
+                  "payable_payment_intent_#{name.demodulize.underscore.pluralize}".to_sym
                 end
               end
 
@@ -180,6 +228,19 @@ module PaymentCore
           end
 
           module InstanceMethods
+
+            def valid_to_be_used?
+              should_be_expired?
+              pending? || confirmed?
+            end
+
+            def should_be_expired?
+              if pending?
+                if expires_at.present? && expires_at.past?
+                  expired!
+                end
+              end
+            end
 
           end
 

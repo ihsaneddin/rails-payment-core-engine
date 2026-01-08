@@ -12,6 +12,7 @@ module PaymentCore
 
           accepts_nested_attributes_for :payment_method_data
 
+          attribute :use_intent_amount, default: false
           attribute :purpose_code, :string
           attribute :note, :string
           attribute :channel, :string

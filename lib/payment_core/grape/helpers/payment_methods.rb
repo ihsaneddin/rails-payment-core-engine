@@ -26,7 +26,7 @@ module PaymentCore
 
           def processor_action_name
             prefix = processor_collective_action? ? "collective" : nil
-            [prefix, params[:processor_action]].compact.join("_")
+            @processor_action_name ||= [prefix, params[:processor_action]].compact.join("_")
           end
 
           def processor_action_arguments
@@ -44,6 +44,7 @@ module PaymentCore
           end
 
           def processor
+            return @processor if @processor
             if processor_collective_action?
               payment_methods = records.where(method_type: payment_method_type)
               unless params[:payment_method_ids].blank?
@@ -55,6 +56,10 @@ module PaymentCore
               @processor ||=
                 record.processor(context: given_context, payer: current_holder)
             end
+            unless @processor.single_action?(processor_action_name) || @processor.collective_action?(processor_action_name)
+              standard_not_found_error(message: e.message)
+            end
+            @processor
           rescue => e
             standard_not_found_error(message: e.message)
           end

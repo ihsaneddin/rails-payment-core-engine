@@ -44,7 +44,7 @@ module PaymentCore
             desc "Processor actions of payment method type"
             post ":processor_action", authorize: [:action, :payment_core_payment_method ],
                   model_name: "PaymentCore::PaymentMethod",
-                  action_name: "collection_action",
+                  action_name: "collective_action",
                   processor_action: true,
                   collective_action: true do
               entry = processor.perform(processor_action_name, *processor_action_arguments)
@@ -70,12 +70,6 @@ module PaymentCore
             end
           end
 
-          # after_validation do
-          #   unless record.available?(context: given_context, holder: current_holder)
-          #     standard_permission_denied_error
-          #   end
-          # end
-
           desc "Processor actions of payment method"
           post ":processor_action", authorize: [:action, :payment_core_payment_method ],
                 model_name: "PaymentCore::PaymentMethod",
@@ -90,8 +84,6 @@ module PaymentCore
           end
 
         end
-
-
 
       end
     end

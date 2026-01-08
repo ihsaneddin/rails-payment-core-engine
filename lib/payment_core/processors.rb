@@ -35,22 +35,22 @@ module PaymentCore
           annotate_method("collective_#{method_name}".to_sym, collective_action: true, &block)
         end
 
-        def params method_name, action_name=nil, collective: false, &block
+        def webhook_action method_name, &block
+          annotate_method("webhook_#{method_name}",to_sym, webhook_action: true, &block)
+        end
+
+        def params method_name, action_name=nil, type: nil, &block
           if action_name.nil?
             if method_name.to_s.end_with?("_params")
               action_name = method_name.to_s.delete_suffix("_params")
             end
           end
           raise "action_name is required" unless action_name
-          if collective
-            action_name = "collective_#{action_name}"
-            method_name = "collective_#{method_name}"
+          if ["collective", "webhook"].include?(type.to_s)
+            action_name = "#{type}_#{action_name}"
+            method_name = "#{type}}_#{method_name}"
           end
           annotate_method(method_name, params: action_name.to_sym, &block)
-        end
-
-        def webhook_action method_name, &block
-          annotate_method(method_name, webhook: true, &block)
         end
 
       end
@@ -68,7 +68,7 @@ module PaymentCore
         end
 
         def action?(method_name)
-          single_action?(method_name) || collective_action?(method_name)
+          single_action?(method_name) || collective_action?(method_name) || webhook_action?(method_name)
         end
 
         def single_action?(method_name)
@@ -79,9 +79,13 @@ module PaymentCore
           self.class.methods_annotated_with(:collective_action, true).any?{|k| k == "#{method_name}".to_sym}
         end
 
-        def params_for method_name, collective: false
-          if collective
-            method_name = "collective_#{method_name}"
+        def collective_action?(method_name)
+          self.class.methods_annotated_with(:webhook_action, true).any?{|k| k == "#{method_name}".to_sym}
+        end
+
+        def params_for method_name, type: nil
+          if ["collective", "webhook"].include?(type.to_s)
+            method_name = "#{type}_#{method_name}"
           end
           mname = self.class.methods_annotated_with(:params, method_name.to_sym)[0]
           if mname
@@ -102,6 +106,7 @@ module PaymentCore
           ::PaymentCore.decorators.payable.payable_classes.find{|klass| klass.payable_api.type == payable_type } ||
           raise { ::ActiveRecord::RecordNotFound }
         end
+
       end
     end
 

@@ -39,31 +39,36 @@ module PaymentCore
     class << self
 
       def load_sidekiq_scheduler(cfg)
-        sidekiq_scheduler_version = SidekiqScheduler::VERSION.to_i
-        schedule_file = PaymentCore::Engine.root.join('config', 'payment_core_schedule.yml')
-        return unless File.exist?(schedule_file)
+        if ::PaymentCore.config.sidekig.scheduler_enabled
+          sidekiq_scheduler_version = SidekiqScheduler::VERSION.to_i
+          schedule_file = PaymentCore::Engine.root.join('config', 'payment_core_schedule.yml')
+          return unless File.exist?(schedule_file)
 
-        schedule_data = YAML.load_file(schedule_file)
-        return unless schedule_data.is_a?(Hash)
+          schedule_data = YAML.load_file(schedule_file)
+          return unless schedule_data.is_a?(Hash)
 
-        payment_core_schedule = schedule_data.dig(:versions, sidekiq_scheduler_version)
-
-        case sidekiq_scheduler_version
-        when 4
-          if payment_core_schedule
-            schedule = schedule.merge(payment_core_schedule)
-            cfg.schedule= schedule
-            queues = cfg[:queues] || []
-          queues = queues + [PaymentCore.config.sidekiq.options[:queue]]
-            SidekiqScheduler::Scheduler.instance.reload_schedule!
+          payment_core_schedule = schedule_data.dig(:versions, sidekiq_scheduler_version)
+          if payment_core_schedule.nil?
+            payment_core_schedule = schedule_data
           end
-        when 5
-          if payment_core_schedule
-            schedule = (Sidekiq.schedule || {}).dup
-            schedule = schedule.merge(payment_core_schedule)
-            Sidekiq.schedule= schedule
-            Sidekiq.default_configuration.queues= cfg[:queues] + [PaymentCore.config.sidekiq.options[:queue]]
-            SidekiqScheduler::Scheduler.instance.reload_schedule!
+
+          case sidekiq_scheduler_version
+          when 4
+            if payment_core_schedule
+              schedule = schedule.merge(payment_core_schedule)
+              cfg.schedule= schedule
+              queues = cfg[:queues] || []
+            queues = queues + [PaymentCore.config.sidekiq.options[:queue]]
+              SidekiqScheduler::Scheduler.instance.reload_schedule!
+            end
+          else
+            if payment_core_schedule
+              schedule = (Sidekiq.schedule || {}).dup
+              schedule = schedule.merge(payment_core_schedule)
+              Sidekiq.schedule= schedule
+              Sidekiq.default_configuration.queues= cfg[:queues] + [PaymentCore.config.sidekiq.options[:queue]]
+              SidekiqScheduler::Scheduler.instance.reload_schedule!
+            end
           end
         end
       end

@@ -177,6 +177,10 @@ module PaymentCore
               custom_attributes_definition :metadata, klass, accessor: true
             end
 
+            def define_enum_states(list_of_states = {})
+              enum state: list_of_states
+            end
+
             def register_state_events
               after_commit do
                 if state.present? && state != state_before_last_save
@@ -271,8 +275,7 @@ module PaymentCore
               end
               with_options if: proc {|record| !record.partial && record.payable } do
                 validate do
-                  if amount < payable.payable_unpaid_amount
-                    debugger
+                  if amount < unpaid_amount
                     errors.add(:amount, :invalid)
                   end
                 end
@@ -420,6 +423,14 @@ module PaymentCore
           end
 
           module InstanceMethods
+
+            def unpaid_amount
+              if metadata.try(:use_intent_amount) && payment_intent
+                payment_intent.amount
+              else
+                payable.payable_unpaid_amount
+              end
+            end
 
             def metadata=(opts)
               if payment_method

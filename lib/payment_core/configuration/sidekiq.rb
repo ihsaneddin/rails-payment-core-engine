@@ -8,6 +8,9 @@ module PaymentCore
       mattr_accessor :worker_class
       @@worker_class = "PaymentCore::Worker"
 
+      mattr_accessor :enable_scheduler
+      @@enable_scheduler = true
+
       class << self
 
         def self.setup &block

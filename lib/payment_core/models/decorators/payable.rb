@@ -86,6 +86,7 @@ module PaymentCore
             include RelationHooks
             extend RelationHooks::ClassMethods
             include PaymentMethodCallbacks
+            include PaymentIntentCallbacks
             include EntryCallbacks
 
             payable_setup do
@@ -166,6 +167,7 @@ module PaymentCore
               assoc_name = klass.payment_intent_relation_name_on_payable
               unless reflect_on_association(assoc_name)
                 has_many assoc_name, class_name: klass.name, as: :payable
+                has_one "active_#{assoc_name.to_s.singularize}".to_sym, -> { where(state: [:pending, :confirmed]) }, class_name: klass.name, as: :payable
                 klass.define_alternative_of_relation(self, relation: :payable)
               end
             end
@@ -191,10 +193,32 @@ module PaymentCore
               callback_name = args[0]
               method_name = args[1]
               opts = { source: :payable, if: proc { payable.present? }, exclusive: false }.merge(opts)
-              callback_for(::PaymentCore::Entry, callback_name, method_name, opts, &block)
-              ::PaymentCore::Entry.descendants.each do |subclass|
-                callback_for(subclass, callback_name, method_name, opts, &block)
+              ::PaymentCore::Models::Decorators::Entry::Object.registered_classes.each do |klass|
+                callback_for(klass, callback_name, method_name, opts, &block)
               end
+              # callback_for(::PaymentCore::Entry, callback_name, method_name, opts, &block)
+              # ::PaymentCore::Entry.descendants.each do |subclass|
+              #   callback_for(subclass, callback_name, method_name, opts, &block)
+              # end
+            end
+          end
+        end
+
+        module PaymentIntentCallbacks
+          extend ActiveSupport::Concern
+          included do
+            define_inheritable_singleton_method :payable_payment_intent_callback do |*args, &block|
+              opts = args.extract_options!
+              callback_name = args[0]
+              method_name = args[1]
+              opts = { source: :payable, if: proc { payable.present? }, exclusive: false }.merge(opts)
+              ::PaymentCore::Models::Decorators::PaymentIntent::Object.registered_classes.each do |klass|
+                callback_for(klass, callback_name, method_name, opts, &block)
+              end
+              # callback_for(::PaymentCore::PaymentIntent, callback_name, method_name, opts, &block)
+              # ::PaymentCore::PaymentIntent.descendants.each do |subclass|
+              #   callback_for(subclass, callback_name, method_name, opts, &block)
+              # end
             end
           end
         end
@@ -211,6 +235,10 @@ module PaymentCore
               avail = smart_send(method_name, arguments)
               avail.nil?? true : avail
             end
+          end
+
+          def payable_paid?
+            payable_status == "paid"
           end
 
         end

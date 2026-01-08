@@ -51,7 +51,7 @@ module PaymentCore
 
       end
 
-      params :charge_params, collective: true do
+      params :charge_params, type: :collective do
         [:amount, :currency, :payable_id, :payable_type, :payable, :partial, :description]
       end
 
