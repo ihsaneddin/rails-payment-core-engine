@@ -7,7 +7,6 @@ module PaymentCore
           extend ::Plugins::Decorators::ConfigBuilder
 
           def self.included base
-            debugger
             invalid_class?(base)
             base.extend ClassMethods
           end
