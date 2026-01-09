@@ -7,19 +7,21 @@ module PaymentCore
     isolate_namespace PaymentCore
     config.generators.api_only = true
 
-    config.to_prepare do
-      Dir.glob(PaymentCore::Engine.root.join("lib/payment_core/processors/**/*.rb")).each do |file|
-        require_dependency file rescue nil
+    initializer "payment_core.loader", before: :set_autoload_paths do |app|
+      paths = []
+      paths << { dir: ::PaymentCore::Engine.root.join('lib/payment_core/models').to_s, namespace: ::PaymentCore::Models}
+      lpath = Rails.root.join("lib/payment_core")
+      if lpath.exist?
+        paths << { dir: lpath.to_s, namespace: ::PaymentCore}
       end
-      Dir.glob(Rails.root.join("lib/payment_core/**/*.rb")).each do |file|
-        require file rescue nil
+      paths.each do |path|
+        Rails.autoloaders.main.push_dir(path[:dir], namespace: path[:namespace])
       end
+    end
 
-      unless Rails.env.production?
-        Dir.glob(PaymentCore::Engine.root.join("app/models/payment_core/**/*.rb")).each do |file|
-          require_dependency file rescue nil
-        end
-      end
+    config.to_prepare do
+      Rails.autoloaders.main.eager_load_namespace(::PaymentCore::Models)
+      Rails.autoloaders.main.eager_load_namespace(::PaymentCore)
     end
 
     extend ::Plugins::EngineCallbacks

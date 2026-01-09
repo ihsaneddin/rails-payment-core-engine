@@ -327,7 +327,7 @@ module PaymentCore
               def inherited subclass
                 super(subclass)
                 after_class_defined(subclass) do
-                  ::PaymentCore.decorators.payable.payable_classes.each do |payable_class|
+                  ::PaymentCore::Models::Decorators::Payable.payable_classes.each do |payable_class|
                     payable_class.payable_setup do
                       define_payable_entry_relation(subclass)
                     end

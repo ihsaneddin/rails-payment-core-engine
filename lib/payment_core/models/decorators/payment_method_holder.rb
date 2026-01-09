@@ -46,8 +46,8 @@ module PaymentCore
           def payment_method_holder(**opts, &block)
             # unless ::ActiveRecord::Base.connection.table_exists?('payment_core_payment_methods')
 
-            default_opts = ::PaymentCore.decorators.payment_method_holder.default_options
-            PaymentCore.decorators.payment_method_holder.plugins_config.setup(self, 'payment_method_holder_config', opts, default_opts,
+            default_opts = ::PaymentCore::Models::Decorators::PaymentMethodHolder.default_options
+            ::PaymentCore::Models::Decorators::PaymentMethodHolder.plugins_config.setup(self, 'payment_method_holder_config', opts, default_opts,
                                                       method_prefix: 'payment_method_holder', &block)
 
             include DepedencyHooks
@@ -62,7 +62,7 @@ module PaymentCore
               define_payment_method_holder_entry_relations
             end
 
-            ::PaymentCore.decorators.payment_method_holder << self
+            ::PaymentCore::Models::Decorators::PaymentMethodHolder << self
 
             define_inheritable_singleton_method(:payment_method_holder?) { true }
 

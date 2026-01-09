@@ -53,8 +53,8 @@ module PaymentCore
             opts[:functions] = ::Plugins::Models::Concerns::Config.build(**functions)
             opts[:payment_method_class] = payment_method_class.name
 
-            default_opts = ::PaymentCore.decorators.payment_method_reference.default_options
-            ::PaymentCore.decorators.payment_method_reference.plugins_config.setup(self, 'payment_method_reference_config', opts, default_opts,
+            default_opts = ::PaymentCore::Models::Decorators::PaymentMethodReference.default_options
+            ::PaymentCore::Models::Decorators::PaymentMethodReference.plugins_config.setup(self, 'payment_method_reference_config', opts, default_opts,
                                                       method_prefix: 'payment_method_reference', &block)
 
             include DepedencyHooks
@@ -69,7 +69,7 @@ module PaymentCore
             end
 
             define_inheritable_singleton_method(:payment_method_reference?) { true }
-            ::PaymentCore.decorators.payment_method_reference << self
+            ::PaymentCore::Models::Decorators::PaymentMethodReference << self
 
             include InstanceMethods
 

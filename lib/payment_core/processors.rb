@@ -1,7 +1,7 @@
 module PaymentCore
   module Processors
-    autoload :Base, "payment_core/processors/base"
-    autoload :Cash, "payment_core/processors/cash"
+    # autoload :Base, "payment_core/processors/base"
+    # autoload :Cash, "payment_core/processors/cash"
 
     module Object
 
@@ -13,6 +13,7 @@ module PaymentCore
         base.inheritable_class_attribute :method_type
         base.attr_reader :payment_method, :context, :payer, :collective
         base.method_type = base.name.demodulize.underscore
+        ::PaymentCore.config.payment_processor_registry.register(base.name)
       end
 
       module ClassMethods
@@ -109,6 +110,9 @@ module PaymentCore
 
       end
     end
+
+    require "payment_core/processors/base"
+    require "payment_core/processors/cash"
 
   end
 end

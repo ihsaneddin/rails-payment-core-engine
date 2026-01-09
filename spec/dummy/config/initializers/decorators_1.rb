@@ -1,6 +1,17 @@
+# Rails.application.config.to_prepare do
+#   loader = Rails.autoloaders.main
+
+#   loader.on_load do |loader, constant, file|
+#     # Implement custom logging logic here
+#     # For example, only log files from a specific directory
+#     if file.include?("lib/payment_core")
+#       Rails.logger.info("Zeitwerk loaded custom payment_core models: #{constant} from #{file}")
+#     end
+#   end
+# end
+
 
 Rails.application.config.after_initialize do
-  Rails.autoloaders.main.eager_load_namespace(PaymentCore)
   PaymentCore::Entry.include(PaymentCore::EntryDecorator)
   Ewallet::Account.include(Ewallet::AccountDecorator)
   Ewallet::Currency.include(Ewallet::CurrencyDecorator)

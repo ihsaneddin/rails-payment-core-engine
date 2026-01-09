@@ -12,7 +12,6 @@ module PaymentCore
       end
 
       custom_attributes_definition :metadata, Metadata, accessor: true, prefix: ''
-
       uses_reference(required: true, use_reference: true, use_reference_attributes: true)
       expirable(required: false)
       refundable

@@ -228,11 +228,11 @@ module PaymentCore
                       define_payment_method_relation(subclass)
                     end
                   end
-                  # ::PaymentCore::Models::Decorators::PaymentMethodHolder.registered_classes.each do |klass|
-                  #   klass.payment_holder_setup do
-                  #     define_payment_method_relation(subclass)
-                  #   end
-                  # end
+                  ::PaymentCore::Models::Decorators::PaymentMethodHolder.registered_classes.each do |klass|
+                    klass.payment_method_holder_setup do
+                      define_payment_method_holder_payment_method_relation(subclass)
+                    end
+                  end
                 end
               end
 
