@@ -9,11 +9,6 @@ module PaymentCore
 
           def details
             object.as_json(
-              include: {
-                components: {
-                  methods: [:type]
-                }
-              },
               methods: [:type]
             )
           end
