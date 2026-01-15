@@ -34,4 +34,5 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'sidekiq-scheduler'
   spec.add_dependency 'hashdiff'
   spec.add_dependency 'validates_timeliness'
+  spec.add_dependency 'state_machines-activerecord'
 end

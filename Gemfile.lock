@@ -1,3 +1,12 @@
+GIT
+  remote: https://github.com/ihsaneddin/state_machines-activerecord.git
+  revision: 3394ede00165a350e56d4efa3e9d9f3ce874770a
+  branch: rails-7-0-fiber-fix
+  specs:
+    state_machines-activerecord (0.9.0)
+      activerecord (>= 6.0)
+      state_machines-activemodel (>= 0.9.0)
+
 PATH
   remote: ../order_core
   specs:
@@ -26,6 +35,7 @@ PATH
       rails (>= 7.0.1)
       ransack (~> 3.1.0)
       store_model
+      with_advisory_lock
 
 PATH
   remote: ../rails-ewallet-engine
@@ -61,6 +71,7 @@ PATH
       ransack (>= 3.1.0)
       sidekiq
       sidekiq-scheduler
+      state_machines-activerecord
       validates_timeliness
 
 GEM
@@ -150,6 +161,7 @@ GEM
     connection_pool (2.5.3)
     crass (1.0.6)
     date (3.4.1)
+    diff-lcs (1.6.2)
     dry-core (1.1.0)
       concurrent-ruby (~> 1.0)
       logger
@@ -291,6 +303,23 @@ GEM
       i18n
     redis-client (0.25.0)
       connection_pool
+    rspec-core (3.13.6)
+      rspec-support (~> 3.13.0)
+    rspec-expectations (3.13.5)
+      diff-lcs (>= 1.2.0, < 2.0)
+      rspec-support (~> 3.13.0)
+    rspec-mocks (3.13.7)
+      diff-lcs (>= 1.2.0, < 2.0)
+      rspec-support (~> 3.13.0)
+    rspec-rails (7.1.1)
+      actionpack (>= 7.0)
+      activesupport (>= 7.0)
+      railties (>= 7.0)
+      rspec-core (~> 3.13)
+      rspec-expectations (~> 3.13)
+      rspec-mocks (~> 3.13)
+      rspec-support (~> 3.13)
+    rspec-support (3.13.6)
     ruby2_keywords (0.0.5)
     rufus-scheduler (3.9.2)
       fugit (~> 1.1, >= 1.11.1)
@@ -311,6 +340,10 @@ GEM
       actionpack (>= 6.1)
       activesupport (>= 6.1)
       sprockets (>= 3.0.0)
+    state_machines (0.100.4)
+    state_machines-activemodel (0.9.0)
+      activemodel (>= 6.0)
+      state_machines (>= 0.6.0)
     store_model (4.2.2)
       activerecord (>= 7.0)
     stringio (3.1.7)
@@ -351,7 +384,9 @@ DEPENDENCIES
   plugins!
   puma
   ransack (~> 3.1.0)
+  rspec-rails
   sprockets-rails
+  state_machines-activerecord!
 
 BUNDLED WITH
    2.5.11
