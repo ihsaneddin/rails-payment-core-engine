@@ -46,6 +46,8 @@ module PaymentCore
 
       end
 
+      action_access :charge, :public
+
       params :charge_params do
         [:amount, :currency, :payable_id, :payable_type, :payable, :partial, metadata: {}]
       end

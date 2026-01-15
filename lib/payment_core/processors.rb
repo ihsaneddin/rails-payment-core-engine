@@ -40,6 +40,18 @@ module PaymentCore
           annotate_method("webhook_#{method_name}",to_sym, webhook_action: true, &block)
         end
 
+        def action_access method_name, *accesses, prefix: nil
+          action_access_method_names(method_name, prefix).each do |mname|
+            annotate_method(mname, action_accesses: accesses.map(&:to_sym))
+          end
+        end
+
+        def remove_action_access method_name, *accesses, prefix: nil
+          action_access_method_names(method_name, prefix).each do |mname|
+            annotate_method(mname, remove_action_accesses: accesses.map(&:to_sym))
+          end
+        end
+
         def validate_payment_method method_name= nil, &block
           annotate_method("validate_#{method_name || SecureRandom.hex(5)}".to_sym, validate_payment_method: true, &block)
         end
@@ -58,6 +70,26 @@ module PaymentCore
           annotate_method(method_name, params: action_name.to_sym, &block)
         end
 
+        def action_access_method_names(method_name, prefix)
+          prefixes = Array(prefix)
+          return [method_name.to_sym] if prefixes.empty?
+
+          prefixes.flat_map do |pref|
+            case pref
+            when nil, :single, :action
+              method_name.to_sym
+            when :collective
+              "collective_#{method_name}".to_sym
+            when :webhook
+              "webhook_#{method_name}".to_sym
+            when :all
+              [method_name.to_sym, "collective_#{method_name}".to_sym, "webhook_#{method_name}".to_sym]
+            else
+              "#{pref}_#{method_name}".to_sym
+            end
+          end.uniq
+        end
+
       end
 
       module InstanceMethods
@@ -71,6 +103,12 @@ module PaymentCore
           else
             raise ::PaymentCore::Errors::UnknownProcessorActionError, "Invalid action name #{action_name}"
           end
+        end
+
+        def perform_with_access(action_name:, accesses: [], action_arguments: nil)
+          validate_action_access!(action_name, accesses: accesses)
+          args = Array(action_arguments).compact
+          perform(action_name, *args)
         end
 
         def action?(method_name)
@@ -123,6 +161,37 @@ module PaymentCore
           end
           unless result
             raise ::PaymentCore::Errors::InvalidPaymentMethodOnProcessor, "Invalid payment method object"
+          end
+        end
+
+        def validate_action_access!(action_name, accesses:)
+          access_list = Array(accesses).compact.map(&:to_sym)
+          annotations = self.class.annotations_for(action_name.to_sym) || {}
+          allowed = annotations[:action_accesses]
+          removed = annotations[:remove_action_accesses]
+
+          if allowed.blank? && action_name.to_s.start_with?("collective_")
+            base_name = action_name.to_s.delete_prefix("collective_").to_sym
+            annotations = self.class.annotations_for(base_name) || {}
+            allowed = annotations[:action_accesses]
+            removed = annotations[:remove_action_accesses]
+          end
+
+          if allowed.blank? && action_name.to_s.start_with?("webhook_")
+            base_name = action_name.to_s.delete_prefix("webhook_").to_sym
+            annotations = self.class.annotations_for(base_name) || {}
+            allowed = annotations[:action_accesses]
+            removed = annotations[:remove_action_accesses]
+          end
+          allowed = Array(allowed).compact.map(&:to_sym)
+          removed = Array(removed).compact.map(&:to_sym)
+          if removed.include?(:all) || removed.include?(:*)
+            allowed = []
+          elsif removed.any?
+            allowed -= removed
+          end
+          unless allowed.any? && (allowed & access_list).any?
+            raise ::PaymentCore::Errors::ProcessorActionNotAllowed, "Processor action not allowed"
           end
         end
 

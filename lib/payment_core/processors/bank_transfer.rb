@@ -39,6 +39,8 @@ module PaymentCore
         next entry
       end
 
+      action_access :charge, :public
+
       params :request_verification_params do
         [:payable_id, :payable_type, :requested_by, :requested_at, proof: [:file_url, :note]]
       end
@@ -72,6 +74,7 @@ module PaymentCore
         entry.request_verification(request_params)
         entry
       end
+
 
       params :verify_params do
         [:payable_id, :payable_type, :accepted, :verified_by, :verified_at]
@@ -108,6 +111,7 @@ module PaymentCore
 
         entry
       end
+
 
     end
   end

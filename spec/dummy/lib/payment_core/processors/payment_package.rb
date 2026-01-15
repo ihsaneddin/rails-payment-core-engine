@@ -51,6 +51,8 @@ module PaymentCore
 
       end
 
+      action_access :charge, :public
+
       params :charge_params, type: :collective do
         [:amount, :currency, :payable_id, :payable_type, :payable, :partial, :description]
       end
@@ -100,6 +102,7 @@ module PaymentCore
 
       end
 
+
       params :refund_params do
         [:payable_id, :payable_type, :payable, :description]
       end
@@ -114,6 +117,7 @@ module PaymentCore
         refund.success
         refund
       end
+
 
 
       def payable_class payable_type

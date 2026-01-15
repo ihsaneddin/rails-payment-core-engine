@@ -4,6 +4,8 @@ module PaymentCore
       class PaymentMethods < Base
 
         add_resource_actions :action
+        inheritable_class_attribute :processor_action_accesses
+        self.processor_action_accesses = [:public]
 
         fetch_resource_and_collection! do
           model_klass do
@@ -47,7 +49,11 @@ module PaymentCore
                   action_name: "collective_action",
                   processor_action: true,
                   collective_action: true do
-              entry = processor.perform(processor_action_name, *processor_action_arguments)
+              entry = processor.perform_with_access(
+                action_name: processor_action_name,
+                accesses: processor_action_accesses,
+                action_arguments: processor_action_arguments
+              )
               if entry.errors.any?
                 standard_validation_error(details: entry.errors)
               else
@@ -75,7 +81,11 @@ module PaymentCore
                 model_name: "PaymentCore::PaymentMethod",
                 action_name: "action",
                 processor_action: true do
-            entry = processor.perform(processor_action_name, *processor_action_arguments)
+            entry = processor.perform_with_access(
+              action_name: processor_action_name,
+              accesses: processor_action_accesses,
+              action_arguments: processor_action_arguments
+            )
             if entry.errors.any?
               standard_validation_error(details: entry.errors)
             else

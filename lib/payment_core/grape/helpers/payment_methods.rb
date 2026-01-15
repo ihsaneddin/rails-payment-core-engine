@@ -8,6 +8,9 @@ module PaymentCore
           base.rescue_from ::PaymentCore::Errors::UnknownProcessorActionError, ::PaymentCore::Errors::UnknownProcessorError do |e|
             standard_not_found_error(message: e.message)
           end
+          base.rescue_from ::PaymentCore::Errors::ProcessorActionNotAllowed do |_e|
+            standard_permission_denied_error
+          end
         end
 
         module HelperMethods
@@ -41,6 +44,10 @@ module PaymentCore
             opts[:collective] = processor_collective_action?
             args << opts
             args
+          end
+
+          def processor_action_accesses
+            class_context.try(:processor_action_accesses) || []
           end
 
           def processor

@@ -179,9 +179,7 @@ RSpec.describe "PaymentCore holder processor actions", type: :request do
         requested_by: "staff",
         proof: { file_url: "https://example.test/proof.png", note: "transfer" }
 
-      expect(last_response.status).to be < 300
-      entry = json_body.fetch("data")
-      expect(entry["state"]).to eq("verification_pending")
+      expect(last_response.status).to eq(401)
 
       post "/holder/#{holder_type}/#{user.id}/payment_method/#{bank_transfer_method.id}/verify",
         payable_id: order.id,
@@ -189,9 +187,7 @@ RSpec.describe "PaymentCore holder processor actions", type: :request do
         accepted: true,
         verified_by: "admin"
 
-      expect(last_response.status).to be < 300
-      entry = json_body.fetch("data")
-      expect(entry["state"]).to eq("succeeded")
+      expect(last_response.status).to eq(401)
     end
   end
 
@@ -222,6 +218,23 @@ RSpec.describe "PaymentCore holder processor actions", type: :request do
       expect(last_response.status).to be < 300
       entry = json_body.fetch("data")
       expect(entry["state"]).to eq("succeeded")
+    end
+
+    it "blocks charge when access scopes do not include public" do
+      payment_package_method = create_payment_package_method
+      order = build_order(item: product_service)
+
+      original_accesses = PaymentCore::Grape::Holder::PaymentMethods.processor_action_accesses
+      PaymentCore::Grape::Holder::PaymentMethods.processor_action_accesses = [:staff]
+      begin
+        post "/holder/#{holder_type}/#{user.id}/payment_method/#{payment_package_method.id}/charge",
+          payable_id: order.id,
+          payable_type: order.class.name,
+          currency: "RM"
+        expect(last_response.status).to eq(401)
+      ensure
+        PaymentCore::Grape::Holder::PaymentMethods.processor_action_accesses = original_accesses
+      end
     end
 
     it "keeps wrapper processing for mixed orders via payment method API" do
@@ -269,9 +282,50 @@ RSpec.describe "PaymentCore holder processor actions", type: :request do
         payable_id: charge_entry["id"],
         payable_type: "charge"
 
+      expect(last_response.status).to eq(401)
+    end
+
+    it "refunds via payment method API when access is configured" do
+      payment_package_method = create_payment_package_method
+      order = build_order(item: product_service)
+
+      post "/holder/#{holder_type}/#{user.id}/payment_method/#{payment_package_method.id}/charge",
+        payable_id: order.id,
+        payable_type: order.class.name,
+        currency: "RM"
+
       expect(last_response.status).to be < 300
-      entry = json_body.fetch("data")
-      expect(entry["state"]).to eq("succeeded")
+      wrapper = json_body.fetch("data")
+      charge_entry = Array(wrapper["components"]).first
+      expect(charge_entry).to be_present
+
+      original_accesses = PaymentCore::Processors::PaymentPackage
+        .annotations_for(:refund)[:action_accesses]
+      original_removals = PaymentCore::Processors::PaymentPackage
+        .annotations_for(:refund)[:remove_action_accesses]
+
+      begin
+        PaymentCore::Processors::PaymentPackage.action_access(:refund, :public)
+        post "/holder/#{holder_type}/#{user.id}/payment_method/#{payment_package_method.id}/refund",
+          payable_id: charge_entry["id"],
+          payable_type: "charge"
+
+        expect(last_response.status).to be < 300
+        entry = json_body.fetch("data")
+        expect(entry["state"]).to eq("succeeded")
+      ensure
+        PaymentCore::Processors::PaymentPackage.clear_annotation_keys_for(
+          :refund,
+          :action_accesses,
+          :remove_action_accesses
+        )
+        if original_accesses
+          PaymentCore::Processors::PaymentPackage.action_access(:refund, *Array(original_accesses))
+        end
+        if original_removals
+          PaymentCore::Processors::PaymentPackage.remove_action_access(:refund, *Array(original_removals))
+        end
+      end
     end
 
     it "charges via collective processor action API" do
