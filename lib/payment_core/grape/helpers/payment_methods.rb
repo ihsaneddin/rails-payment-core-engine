@@ -73,11 +73,8 @@ module PaymentCore
 
           def given_context
             return @context if @context
-            builder = ::PaymentCore.config.payment_method.default_context_builder
-            context_opts = params[:context] || {}
-            context_opts[:payables] = payables(context_opts[:payables])
-            context_opts = { user: current_user, data: params }.merge(context_opts)
-            @context = builder.is_a?(Proc) ? instance_exec(context_opts, &builder) : builder
+            context_builder = class_context.try(:given_context)
+            @context = context_builder.is_a?(Proc) ? instance_exec(&context_builder) : context_builder
           end
 
           def payables(payable_params = {})

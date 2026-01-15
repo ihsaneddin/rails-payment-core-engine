@@ -4,8 +4,15 @@ module PaymentCore
       class PaymentMethods < Base
 
         add_resource_actions :action
-        inheritable_class_attribute :processor_action_accesses
+        inheritable_class_attribute :processor_action_accesses, :given_context
         self.processor_action_accesses = [:public]
+        self.given_context = lambda do
+          builder = ::PaymentCore.config.payment_method.default_context_builder
+          context_opts = params[:context] || {}
+          context_opts[:payables] = payables(context_opts[:payables])
+          context_opts = { user: current_user, data: params }.merge(context_opts)
+          builder.is_a?(Proc) ? instance_exec(context_opts, &builder) : builder
+        end
 
         fetch_resource_and_collection! do
           model_klass do
