@@ -62,7 +62,8 @@ module PaymentCore
               type: proc {
                       name.demodulize.underscore
                     }
-            })
+            }),
+            entry_requirements: ::PaymentCore::Models::Decorators::Payable.plugins_collection_config.build(**{ rules: {} })
           }
         end
 
@@ -167,7 +168,7 @@ module PaymentCore
               assoc_name = klass.payment_intent_relation_name_on_payable
               unless reflect_on_association(assoc_name)
                 has_many assoc_name, class_name: klass.name, as: :payable
-                has_one "active_#{assoc_name.to_s.singularize}".to_sym, -> { where(state: [:pending, :confirmed]) }, class_name: klass.name, as: :payable
+                has_one "active_#{assoc_name.to_s.singularize}".to_sym, -> { order(created_at: :desc) }, class_name: klass.name, as: :payable
                 klass.define_alternative_of_relation(self, relation: :payable)
               end
             end

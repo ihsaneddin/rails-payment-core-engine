@@ -227,7 +227,7 @@ module PaymentCore
                 else
                   allocated_base_amount = available_method_amount
                 end
-                next if allocated_base_amount.zero?
+                next if allocated_base_amount.zero? #|| allocated_base_amount > available_method_amount
 
                 allocations << Allocation.new(
                   payable: payable,

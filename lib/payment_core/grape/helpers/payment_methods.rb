@@ -57,7 +57,7 @@ module PaymentCore
                 record.processor(context: given_context, payer: current_holder)
             end
             unless @processor.single_action?(processor_action_name) || @processor.collective_action?(processor_action_name)
-              standard_not_found_error(message: e.message)
+              standard_not_found_error(message: "Not found")
             end
             @processor
           rescue => e
@@ -84,7 +84,7 @@ module PaymentCore
 
           def payable_class(payable_type)
             payable_type.safe_constantize ||
-            ::PaymentCore.decorators.payable.payable_classes.find{|klass| klass.payable_api.type == payable_type } ||
+            ::PaymentCore::Models::Decorators::Payable.registered_classes.find{|klass| klass.payable_api.type == payable_type } ||
             raise { ::ActiveRecord::RecordNotFound }
           end
 

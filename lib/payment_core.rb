@@ -4,6 +4,7 @@ require 'alba'
 require 'plugins'
 require 'grape'
 require 'grape-entity'
+require 'state_machines-activerecord'
 
 module PaymentCore
 

@@ -18,7 +18,7 @@ module PaymentCore
     def expiry
       resource do |intent|
         if intent
-          intent.should_be_expired?
+          intent.expiry
         end
       end
     end

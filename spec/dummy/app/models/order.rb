@@ -14,6 +14,10 @@ class Order < OrderCore::Order
     components do
       line_items
     end
+    entry_requirements do
+      bank_transfer_charge_requires_proof true
+      bank_transfer_charge_requires_verification true
+    end
   end
 
   payable_entries_callback :after_save do |entry|
@@ -21,6 +25,8 @@ class Order < OrderCore::Order
       complete!
     end
   end
+
+  after_save :create_payment_intent_for_waiting_payment
 
   acts_as_ewallet_entry_reference
 
@@ -42,6 +48,17 @@ class Order < OrderCore::Order
 
   def after_completed?
     state.present? && saved_change_to_state? && state == 'completed'
+  end
+
+  def create_payment_intent_for_waiting_payment
+    return unless saved_change_to_state?
+    return unless state == "waiting_payment"
+    return if active_payable_payment_intent.present?
+
+    PaymentCore::PaymentIntent.create!(
+      payable: self,
+      currency: payable_currency || "RM"
+    )
   end
 
   publishes_event :completed, on: :complete!, bus: :order

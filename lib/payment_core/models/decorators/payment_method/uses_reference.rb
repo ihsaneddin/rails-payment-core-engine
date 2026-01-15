@@ -40,11 +40,11 @@ module PaymentCore
               end
               with_options if: :reference do
                 validate do
-                  errors.add(:reference, :invalid) unless valid_reference?
+                  errors.add(:reference, :invalid_reference) unless valid_reference?
                 end
                 validate do
                   unless self.class <= reference.payment_method_type
-                    errors.add(:type, :invalid)
+                    errors.add(:type, :invalid_reference_type)
                   end
                 end
               end
@@ -53,12 +53,16 @@ module PaymentCore
               include InstanceMethods
             end
 
+            def uses_reference?
+              false
+            end
+
           end
 
           module InstanceMethods
 
             def valid_reference?
-              reference && reference.class.include?(::PaymentCore.decorators.payment_method_reference_object)
+              reference && reference.class.payment_method_reference?
             end
 
             def reference_attributes

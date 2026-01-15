@@ -100,6 +100,7 @@ namespace :payment_core do
         }
       )
       puts "The order state should be 'completed'"
+      debugger
       if order.reload.state != "completed"
         raise "Test failed"
       end

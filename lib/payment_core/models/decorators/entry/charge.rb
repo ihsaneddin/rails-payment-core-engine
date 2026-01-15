@@ -16,7 +16,7 @@ module PaymentCore
             end
 
             def define_charge_entries_relation_to_payable_classes
-              ::PaymentCore.decorators.payable.payable_classes.each do |payable_class|
+              ::PaymentCore::Models::Decorators::Payable.registered_classes.each do |payable_class|
                 payable_class.define_payable_entry_relation(self)
               end
             end

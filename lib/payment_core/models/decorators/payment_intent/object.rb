@@ -6,13 +6,6 @@ module PaymentCore
 
           include ::Plugins.decorators.traits
 
-          STATES = {
-            pending: "pending",
-            expired: "expired",
-            confirmed: "confirmed",
-            canceled: "canceled"
-          }
-
           def invalid_class?(base)
             unless base.include?(::PaymentCore::Models::Decorators::PaymentIntent::Object)
               raise "Invalid : #{base.name} does not include #{::PaymentCore::Models::Decorators::PaymentIntent::Object} module"
@@ -33,6 +26,7 @@ module PaymentCore
 
             base.include DepedencyHooks
             base.extend ClassMethods
+            base.include StateMachine
             base.include Hooks
             base.extend Hooks::ClassMethods
             base.include RelationHooks
@@ -46,7 +40,6 @@ module PaymentCore
             base.setup do
               register_cycle_events
               define_entry_relations
-              define_enum_states(STATES)
               register_state_events
               register_state_method_helpers
             end
@@ -88,10 +81,6 @@ module PaymentCore
               custom_attributes_definition :metadata, klass, accessor: true
             end
 
-            def define_enum_states(list_of_states = {})
-              enum state: list_of_states
-            end
-
             def register_state_events
               after_commit do
                 if state.present? && state != state_before_last_save
@@ -113,32 +102,80 @@ module PaymentCore
             end
 
             def register_state_method_helpers
-              states.each do |k,v|
-                define_method "after_state_#{k}?" do
-                  saved_change_to_state? && state == k
+              state_machine(:state).states.each do |st|
+                st_name = st.name
+                define_method "after_state_#{st_name}?" do
+                  saved_change_to_state? && state == st_name.to_s
                 end
-
-                define_method "state_will_be_#{k}?" do
-                  will_save_change_to_state? && state == k
+                define_method "state_will_be_#{st_name}?" do
+                  will_save_change_to_state? && state == st_name.to_s
                 end
               end
             end
 
-
           end
 
+          module StateMachine
+            extend ActiveSupport::Concern
+
+             STATES = {
+              pending: "pending",
+              expired: "expired",
+              confirmed: "confirmed",
+              canceled: "canceled"
+            }
+            included do
+
+              state_machine :state, initial: :pending do
+                state(*STATES.keys)
+
+                before_transition any => :confirmed do |entry|
+                  entry.confirmed_at = Time.current
+                end
+
+                event :confirm do
+                  transition pending: :confirmed
+                end
+                event :expiry do
+                  transition pending: :expired
+                end
+                event :cancel do
+                  transition pending: :canceled
+                end
+
+                state :expired do
+                  validate :should_be_expired?
+                end
+
+              end
+
+            end
+          end
           module Hooks
             extend ActiveSupport::Concern
 
             included do
 
-              scope :expires_on_date, ->(date) { where.not(expires_at: nil).where("DATE(expires_at) = ?", date) }
-
-              before_save do
-                if state_will_be_confirmed?
-                  self.confirmed_at = Time.current
+              define_inheritable_singleton_method :entry_callback do |*args, &block|
+                opts = args.extract_options!
+                callback_name = args[0]
+                method_name = args[1]
+                opts = { source: :payment_intent, if: true, exclusive: true }.merge(opts)
+                ::PaymentCore::Models::Decorators::Entry::Object.registered_classes.each do |klass|
+                  callback_for(klass, callback_name, method_name, opts, &block)
                 end
               end
+
+              scope :expires_on_date, ->(date) { where.not(expires_at: nil).where("DATE(expires_at) = ?", date) }
+
+              entry_callback :validate do |entry|
+                if metadata.strict_entry_class
+                  unless metadata.allowed_entry_classes.include?(entry.class.name)
+                    entry.errors.add(:type, :entry_type_not_allowed)
+                  end
+                end
+              end
+
             end
 
             def schedule_for_expiration
@@ -146,7 +183,7 @@ module PaymentCore
                 if expires_at.past?
                   PaymentCore::PaymentIntentWorker.perform_at(Time.current + 5.seconds, id, 'expiry')
                 else
-                  PaymentCore::PaymentIntentWorker.perform_at(expires_at, id, 'expiry')
+                  PaymentCore::PaymentIntentWorker.perform_at(expires_at + 1.second, id, 'expiry')
                 end
               end
             end
@@ -177,7 +214,7 @@ module PaymentCore
               def inherited subclass
                 super(subclass)
                 after_class_defined(subclass) do
-                  ::PaymentCore.decorators.payable.payable_classes.each do |payable_class|
+                  ::PaymentCore::Models::Decorators::Payable.registered_classes.each do |payable_class|
                     payable_class.payable_setup do
                       define_payable_payment_intent_relation(subclass)
                     end
@@ -230,16 +267,16 @@ module PaymentCore
           module InstanceMethods
 
             def valid_to_be_used?
-              should_be_expired?
-              pending? || confirmed?
+              not_expired! && (pending? || confirmed?)
             end
 
             def should_be_expired?
-              if pending?
-                if expires_at.present? && expires_at.past?
-                  expired!
-                end
-              end
+              expires_at.present? && expires_at.past? && pending?
+            end
+
+            def not_expired!
+              expiry if should_be_expired?
+              !expired?
             end
 
           end

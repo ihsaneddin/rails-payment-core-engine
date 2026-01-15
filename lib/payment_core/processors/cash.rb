@@ -41,7 +41,7 @@ module PaymentCore
         end
 
         PaymentCore::Entry.wrap( entries, { amount: params[:amount], partial: params[:partial], payer: payer, payable: payable, metadata: params[:metadata] }) do |entry|
-          entry.success!
+          entry.success
         end
 
       end
@@ -52,7 +52,7 @@ module PaymentCore
 
       def payable_class payable_type
         payable_type.safe_constantize ||
-        ::PaymentCore.decorators.payable.payable_classes.find{|klass| klass.payable_api.type == payable_type } ||
+        ::PaymentCore::Models::Decorators::Payable.registered_classes.find{|klass| klass.payable_api.type == payable_type } ||
         raise { ::ActiveRecord::RecordNotFound }
       end
 

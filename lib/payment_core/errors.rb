@@ -11,6 +11,7 @@ module PaymentCore
 
     class UnknownProcessorError < StandardError; end
     class UnknownProcessorActionError < StandardError; end
+    class InvalidPaymentMethodOnProcessor < StandardError; end
 
   end
 end

@@ -6,6 +6,22 @@ module PaymentCore
 
       self.direction = "out"
 
+      # | Entry Type     | Allowed States                                                        | Notes                             |
+      # | -------------- | --------------------------------------------------------------------- | --------------------------------- |
+      # | **refund**     | `pending`, `processing`, `succeeded`, `failed`                        | No `expired`, rarely `canceled`   |
+
+      state_machine :state, initial: :pending do
+        event :process do
+          transition [:pending, :failed] => :processing
+        end
+        event :success do
+          transition [:pending, :failed, :processing] => :succeeded
+        end
+        event :failure do
+          transition [:pending, :processing] => :failed
+        end
+      end
+
       attr_accessor :use_payable_data
 
       with_options if: proc {|record| record.use_payable_data && record.payable } do
@@ -17,8 +33,6 @@ module PaymentCore
           end
         end
       end
-
-      # va
 
     end
   end

@@ -11,6 +11,10 @@
 # end
 
 
+require_dependency Rails.root.join("lib/payment_core/entry_decorator").to_s
+require_dependency Rails.root.join("lib/ewallet/account_decorator").to_s
+require_dependency Rails.root.join("lib/ewallet/currency_decorator").to_s
+
 Rails.application.config.after_initialize do
   PaymentCore::Entry.include(PaymentCore::EntryDecorator)
   Ewallet::Account.include(Ewallet::AccountDecorator)

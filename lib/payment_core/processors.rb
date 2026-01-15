@@ -40,6 +40,10 @@ module PaymentCore
           annotate_method("webhook_#{method_name}",to_sym, webhook_action: true, &block)
         end
 
+        def validate_payment_method method_name= nil, &block
+          annotate_method("validate_#{method_name || SecureRandom.hex(5)}".to_sym, validate_payment_method: true, &block)
+        end
+
         def params method_name, action_name=nil, type: nil, &block
           if action_name.nil?
             if method_name.to_s.end_with?("_params")
@@ -62,6 +66,7 @@ module PaymentCore
             opts = args.extract_options!
             params = args[0] || opts.delete(:params)
             context = args[1] || opts.delete(:context)
+            validate_payment_method(payment_method, params)
             send(action_name, params, context, **opts)
           else
             raise ::PaymentCore::Errors::UnknownProcessorActionError, "Invalid action name #{action_name}"
@@ -80,7 +85,7 @@ module PaymentCore
           self.class.methods_annotated_with(:collective_action, true).any?{|k| k == "#{method_name}".to_sym}
         end
 
-        def collective_action?(method_name)
+        def webhook_action?(method_name)
           self.class.methods_annotated_with(:webhook_action, true).any?{|k| k == "#{method_name}".to_sym}
         end
 
@@ -102,10 +107,23 @@ module PaymentCore
           cfg.presenter
         end
 
+        private
+
         def payable_class payable_type
           payable_type.safe_constantize ||
-          ::PaymentCore.decorators.payable.payable_classes.find{|klass| klass.payable_api.type == payable_type } ||
+          ::PaymentCore::Models::Decorators::Payable.registered_classes.find{|klass| klass.payable_api.type == payable_type } ||
           raise { ::ActiveRecord::RecordNotFound }
+        end
+
+        def validate_payment_method(payment_method, params)
+          result = self.class.methods_annotated_with(:validate_payment_method, true).all? do |mname|
+            arguments = [payment_method, params]
+            valid = smart_send(mname, arguments)
+            valid.nil? ? true : valid
+          end
+          unless result
+            raise ::PaymentCore::Errors::InvalidPaymentMethodOnProcessor, "Invalid payment method object"
+          end
         end
 
       end
@@ -113,6 +131,7 @@ module PaymentCore
 
     require "payment_core/processors/base"
     require "payment_core/processors/cash"
+    require "payment_core/processors/bank_transfer"
 
   end
 end

@@ -134,7 +134,9 @@ module PaymentCore
             def define_payment_method_holder_entry_relation(klass= ::PaymentCore::Entry)
               assoc_name = klass.entry_relation_name_on_holder
               unless reflect_on_association(assoc_name)
-                has_many assoc_name, through: ::PaymentCore::PaymentMethod.payment_method_relation_name_on_holder, source: ::PaymentCore::PaymentMethod.payment_method_relation_name_on_entry
+                has_many assoc_name,
+                  through: ::PaymentCore::PaymentMethod.payment_method_relation_name_on_holder,
+                  source: klass.entry_relation_name_on_payment_method
               end
             end
 

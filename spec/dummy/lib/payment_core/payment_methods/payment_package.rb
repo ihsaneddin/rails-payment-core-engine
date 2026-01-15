@@ -45,7 +45,7 @@ module PaymentCore
       end
 
       entry_callback :validate, if: proc { payable.present? } do |entry|
-        entry.errors.add(:balance, 'Insufficient balance') if entry.charge? && (entry.payment_method_amount > balance)
+        entry.errors.add(:balance, 'Insufficient balance') if entry.charge? && (entry.payment_method_amount > balance) && entry.state_will_be_succeeded?
       end
 
       entry_callback :validate do |entry|

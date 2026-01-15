@@ -50,6 +50,7 @@ module PaymentCore
               register_cycle_events
               register_state_events
               register_state_method_helpers
+              define_state_alias_scopes
               define_payment_method_relations
               define_payment_intent_relations
             end
@@ -84,17 +85,17 @@ module PaymentCore
           module StateHooks
             extend ActiveSupport::Concern
 
-            included do
-              # | Entry Direction| Allowed States                                                        | Notes                             |
-              # | -------------- | --------------------------------------------------------------------- | --------------------------------- |
-              # | **payment**    | `pending`, `processing`, `succeeded`, `failed`, `canceled`, `expired` | Most common stateful process      |
-              # | **refund**     | `pending`, `processing`, `succeeded`, `failed`                        | No `expired`, rarely `canceled`   |
-              # | **deposit**    | `succeeded`, `failed`, `pending`, `processing`                        | Often manually marked `succeeded` |
-              # | **withdraw**   | `pending`, `processing`, `succeeded`, `failed`, `canceled`            | Typically async to a bank         |
-              # | **transfer**   | `succeeded`, `failed`, `processing`                                   | Can be instantaneous or queued    |
-              # | **adjustment** | `succeeded`, `failed`                                                 | Usually a one-time admin op       |
-              # | **wrapper**    | `pending`, `succeeded`, `failed`                                  | for wrapper                       |
-              enum state: {
+            # | Entry Direction| Allowed States                                                        | Notes                             |
+            # | -------------- | --------------------------------------------------------------------- | --------------------------------- |
+            # | **charge**     | `pending`, `processing`, `succeeded`, `failed`, `canceled`, `expired` | Most common stateful process      |
+            # | **refund**     | `pending`, `processing`, `succeeded`, `failed`                        | No `expired`, rarely `canceled`   |
+            # | **deposit**    | `succeeded`, `failed`, `pending`, `processing`                        | Often manually marked `succeeded` |
+            # | **withdraw**   | `pending`, `processing`, `succeeded`, `failed`, `canceled`            | Typically async to a bank         |
+            # | **transfer**   | `succeeded`, `failed`, `processing`                                   | Can be instantaneous or queued    |
+            # | **adjustment** | `succeeded`, `failed`                                                 | Usually a one-time admin op       |
+            # | **wrapper**    | `pending`, `succeeded`, `failed`                                  | for wrapper                       |
+
+            STATES = {
                 pending:       'pending',       # created, awaiting action
                 processing:    'processing',    # in progress, may resolve async
                 succeeded:     'succeeded',     # completed successfully
@@ -103,15 +104,78 @@ module PaymentCore
                 expired:       'expired',       # timed out / no longer valid
                 reversed:      'reversed',      # undone after success (rare)
                 disputed:      'disputed',      # challenged by customer (card, etc)
-              }#, _prefix: :state
+            }
 
-              states.keys.each do |state_name|
-                define_method state_name do
-                  self.state = state_name
+            included do
+
+              state_machine :state, initial: :pending do
+                state(*STATES.keys)
+
+                before_transition any => :processing do |entry|
+                  entry.processed_at = Time.current
                 end
+                before_transition any => :succeeded do |entry|
+                  entry.succeeded_at = Time.current
+                end
+
               end
 
             end
+
+            class_methods do
+              def before_state_transition *args, &block
+                opts = args.extract_options!
+                from = opts[:from]
+                to = opts[:to]
+
+                machine_names = args.blank? ? state_machines.keys : args
+                machine_names.each do |machine_name|
+                  machine_key = machine_name || :state
+                  next unless state_machines.keys.include?(machine_key)
+                  state_machine(machine_key) do
+                    before_transition (from || any) => (to || any) do |record, transition|
+                      args = transition.args.dup
+                      kwargs = args.last.is_a?(Hash) ? args.pop : {}
+                      record.instance_variable_set(:@_state_machine_transition, transition)
+                      begin
+                        record.instance_exec(*args, **kwargs, &block)
+                      ensure
+                        record.instance_variable_set(:@_state_machine_transition, transition)
+                      end
+                    end
+                  end
+                end
+              end
+
+              def after_state_transition *args, &block
+                opts = args.extract_options!
+                from = opts[:from]
+                to = opts[:to]
+
+                machine_names = args.blank? ? state_machines.keys : args
+                machine_names.each do |machine_name|
+                  machine_key = machine_name || :state
+                  next unless state_machines.keys.include?(machine_key)
+                  state_machine(machine_key) do
+                    after_transition (from || any) => (to || any) do |record, transition|
+                      args = transition.args.dup
+                      kwargs = args.last.is_a?(Hash) ? args.pop : {}
+                      record.instance_variable_set(:@_state_machine_transition, transition)
+                      begin
+                        record.instance_exec(*args, **kwargs, &block)
+                      ensure
+                        record.instance_variable_set(:@_state_machine_transition, transition)
+                      end
+                    end
+                  end
+                end
+              end
+            end
+
+            def current_state_transition
+              @_state_machine_transition
+            end
+
           end
 
           module ClassMethods
@@ -120,29 +184,31 @@ module PaymentCore
               result =
               if block_given?
                 wrapper = PaymentCore::Entries::Wrapper.new(params)
-                wrapper.pending
                 wrapper.idempotency_lock!(window: 5.seconds) do
                   begin
-                    if wrapper.process!
+                    if wrapper.process
                       entries.each_with_index do |entry, i|
                         yield(entry, wrapper)
                         wrapper.components << entry
-                        wrapper = entry.parent
+                        if wrapper.state != entry.parent.state
+                          wrapper = entry.parent
+                        end
                         entry.errors.each {|e| wrapper.errors.import e, **e.options.merge(attribute: "components.#{i}.#{e.attribute}")}
                       end
                     end
-                    wrapper.success! unless wrapper.succeeded?
+                    wrapper.success! if wrapper.errors.blank? && !wrapper.succeeded?
                     raise ActiveRecord::Rollback if wrapper.errors.any?
                   rescue => e
                     wrapper.errors.add(:base, e.message) unless wrapper.errors.any?
                     raise ActiveRecord::Rollback, e.message
                   end
                 end
+                wrapper.state = "failed" unless wrapper.persisted?
                 wrapper
               end
               result = if result.nil?
                 result = self.class.new
-                result.errors.add(:id, :invalid)
+                result.errors.add(:id, :wrap_failed)
                 result
               else
                 result
@@ -177,10 +243,6 @@ module PaymentCore
               custom_attributes_definition :metadata, klass, accessor: true
             end
 
-            def define_enum_states(list_of_states = {})
-              enum state: list_of_states
-            end
-
             def register_state_events
               after_commit do
                 if state.present? && state != state_before_last_save
@@ -212,7 +274,6 @@ module PaymentCore
               end
               before_validation do
                 self.direction = self.class.direction
-                self.state ||= "pending"
               end
               before_save do
                 # self.payment_method_amount ||= self.amount
@@ -221,10 +282,21 @@ module PaymentCore
             end
 
             def register_state_method_helpers
-              states.each do |k,v|
-                define_method "after_state_#{k}?" do
-                  saved_change_to_state? && state == k
+              state_machine(:state).states.each do |st|
+                st_name = st.name
+                define_method "after_state_#{st_name}?" do
+                  saved_change_to_state? && state == st_name.to_s
                 end
+                define_method "state_will_be_#{st_name}?" do
+                  will_save_change_to_state? && state == st_name.to_s
+                end
+              end
+            end
+
+            def define_state_alias_scopes
+              state_machine(:state).states.each do |state_def|
+                state_name = state_def.name
+                scope state_name, -> { with_state(state_name) } unless respond_to?(state_name)
               end
             end
 
@@ -260,30 +332,30 @@ module PaymentCore
                 validate do
                   entry_type = self.class.entry_type
                   unless payment_method.class.allowed_entry_types.include?(entry_type)
-                    errors.add(:payment_method, :invalid)
+                    errors.add(:payment_method, :entry_type_not_allowed)
                   end
                 end
                 validates :payment_method_amount, presence: true, numericality: { greater_than_or_equal_to: 0, allow_blank: true }
               end
               with_options if: :parent do
                 validate do
-                  errors.add(:parent, :invalid) unless parent.wrapper?
+                  errors.add(:parent, :not_wrapper) unless parent.wrapper?
                 end
                 after_save do
-                  parent.success! if parent.may_success?
+                  parent.success if parent.wrapper? #&& parent.may_success?
                 end
               end
               with_options if: proc {|record| !record.partial && record.payable } do
                 validate do
                   if amount < unpaid_amount
-                    errors.add(:amount, :invalid)
+                    errors.add(:amount, :insufficient_amount)
                   end
                 end
               end
               with_options if: :payable do
                 validate on: :create do
                   if payable.payable_status == "paid"
-                    errors.add(:amount, "paid")
+                    errors.add(:amount, :already_paid)
                   end
                 end
               end
@@ -439,18 +511,12 @@ module PaymentCore
               super(opts)
             end
 
+            def payment_method=(value)
+              super(value)
+            end
+
             def component?
               parent_id.present?
-            end
-
-            def success!
-              self.succeeded_at= Time.current
-              succeeded!
-            end
-
-            def process!
-              self.processed_at= Time.current
-              processing!
             end
 
             def method_missing(name, *args, &block)

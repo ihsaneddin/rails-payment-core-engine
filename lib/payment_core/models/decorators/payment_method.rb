@@ -17,6 +17,7 @@ module PaymentCore
         autoload :UsesReference, "payment_core/models/decorators/payment_method/uses_reference"
         autoload :Reusable, "payment_core/models/decorators/payment_method/reusable"
         autoload :Withdrawable, "payment_core/models/decorators/payment_method/withdrawable"
+        autoload :BankTransferable, "payment_core/models/decorators/payment_method/withdrawable"
 
         #
         # require "payment_core/models/decorators/payment_method/object"

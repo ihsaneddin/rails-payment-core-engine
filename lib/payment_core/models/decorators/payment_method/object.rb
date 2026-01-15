@@ -35,10 +35,11 @@ module PaymentCore
              base.include Hooks
              base.extend Hooks::ClassMethods
 
-             base.inheritable_class_attribute :method_type, :allowed_entry_types, :direction, :requires_payable
+             base.inheritable_class_attribute :method_type, :allowed_entry_types, :direction, :requires_payable, :entry_method_data_defaults_config
              base.method_type = base.name.demodulize.underscore
              base.allowed_entry_types = Set.new(['charge'])
              base.direction = :credit
+             base.entry_method_data_defaults_config = nil
 
              base.setup do
                define_metadata_class
@@ -88,6 +89,10 @@ module PaymentCore
               self.allowed_entry_types += [entry_type]
             end
 
+            def remove_allowed_entry_type(entry_type)
+              self.allowed_entry_types -= [entry_type]
+            end
+
             def allows_entry_type?(entry_type)
               allowed_entry_types.include?(entry_type.to_s)
             end
@@ -104,6 +109,13 @@ module PaymentCore
                   [:id]
                 end
               }
+            end
+
+            def entry_method_data_defaults(value = nil, &block)
+              if block_given? || !value.nil?
+                self.entry_method_data_defaults_config = block_given? ? block : value
+              end
+              entry_method_data_defaults_config
             end
 
             def setup &block
@@ -146,7 +158,7 @@ module PaymentCore
                 method_name = args[1]
                 opts = { source: :payment_method, if: true, exclusive: false }.merge(opts)
                 ::PaymentCore::Models::Decorators::Entry::Object.registered_classes.each do |klass|
-                  callback_for(::PaymentCore::Entry, callback_name, method_name, opts, &block)
+                  callback_for(klass, callback_name, method_name, opts, &block)
                 end
               end
 
@@ -155,7 +167,7 @@ module PaymentCore
               end
 
               entry_callback :validate do |entry|
-                entry.errors.add(:payment_method, 'Not available') unless available?(context: entry.context)
+                entry.errors.add(:payment_method, :unavailable) unless available?(context: entry.context)
               end
 
               entry_callback :validate, if: proc { payment_method && payment_method.requires_payable? } do |entry|
@@ -163,7 +175,7 @@ module PaymentCore
               end
 
               entry_callback(:validate) do |entry|
-                entry.errors.add(:payment_method, :invalid) unless self.class.allows_entry_type?(entry.class.entry_type)
+                entry.errors.add(:payment_method, :entry_type_not_allowed) unless self.class.allows_entry_type?(entry.class.entry_type)
               end
 
               entry_callback(:after_save) do |entry|
@@ -271,8 +283,12 @@ module PaymentCore
               def define_entry_relation(klass= ::PaymentCore::Entry)
                 assoc_name = klass.entry_relation_name_on_payment_method
                 unless reflect_on_association(assoc_name)
+                  scope = nil
+                  unless klass == klass.base_class
+                    scope = -> { where(type: klass.name) }
+                  end
                   has_many(
-                    assoc_name, -> { where(type: sub.name) },
+                    assoc_name, scope,
                     class_name: klass.name, foreign_key: :payment_method_id, inverse_of: :payment_method,
                     extend: ::Plugins::Models::Extensions::Association::HasManyStiBuildersPatch.call(klass.name), dependent: :nullify
                   )
@@ -282,6 +298,12 @@ module PaymentCore
           end
 
           module InstanceMethods
+
+            def entry_method_data_defaults
+              defaults = self.class.entry_method_data_defaults
+              defaults = instance_exec(&defaults) if defaults.is_a?(Proc)
+              defaults || {}
+            end
 
             def method_missing(method_name, *args, &block)
               registered_types = ::PaymentCore::Models::Decorators::PaymentMethod::Object.registered_method_types.to_a.map{|type| "#{type}?" }
@@ -322,7 +344,11 @@ module PaymentCore
             end
 
             def processor(context: nil, payer: nil)
-              @processor ||= ::PaymentCore.config.payment_processor_registry.resolve(self.method_type).new(self, **{ context: context, payer: payer })
+              @processor ||= custom_processor_class || ::PaymentCore.config.payment_processor_registry.resolve(self.method_type).new(self, **{ context: context, payer: payer })
+            end
+
+            def custom_processor_class
+              metadata.processor_class ? metadata.processor_class.constantize : nil
             end
 
             def requires_payable?

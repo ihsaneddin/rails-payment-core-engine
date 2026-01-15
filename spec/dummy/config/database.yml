@@ -19,4 +19,4 @@ development:
 
 test:
   <<: *default
-  database: dummy_payment_core_development
+  database: dummy_payment_core_test
