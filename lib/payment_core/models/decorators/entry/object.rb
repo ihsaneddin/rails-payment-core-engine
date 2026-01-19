@@ -42,8 +42,9 @@ module PaymentCore
 
             base.eventable_bus_name = base.name.demodulize.underscore.to_sym
 
-            base.inheritable_class_attribute :entry_type, :direction
+            base.inheritable_class_attribute :entry_type, :direction, :entry_name
             base.entry_type= base.name.demodulize.underscore
+            base.entry_name= base.name.demodulize.underscore
 
             base.setup do
               register_default_callbacks
@@ -365,6 +366,7 @@ module PaymentCore
               def inherited(subclass)
                 super(subclass)
                 subclass.entry_type= subclass.name.demodulize.underscore
+                subclass.entry_name= subclass.name.demodulize.underscore
                 ::PaymentCore::Models::Decorators::Entry::Object << subclass
                 # after_class_defined(subclass) do
                 # end

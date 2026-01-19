@@ -17,7 +17,7 @@ module PaymentCore
         }.compact
       end
 
-      allows_entry_type "charge_bank_transfer"
+      allows_entry_type "charge"
 
     end
   end

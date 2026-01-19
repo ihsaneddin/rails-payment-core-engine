@@ -13,7 +13,6 @@ module PaymentCore
         if !payable.class.try(:payable?) && params[:payable_type].present? && params[:payable_id].present?
           payable_class(params[:payable_type]).payable_api.finder(params[:payable_id])
         end
-
         if payment_method.require_intent? && payable.active_payable_payment_intent.blank?
           entry = PaymentCore::Entries::Charges::BankTransfer.new
           entry.errors.add(:payment_intent_id, :required)
@@ -51,12 +50,18 @@ module PaymentCore
           payable_class(params[:payable_type]).payable_api.finder(params[:payable_id])
         end
 
+        entry_id = params[:entry_id]
+
         entry = if payable
-          payable.payable_entries
+          scope = payable.payable_entries
             .with_entry_types(PaymentCore::Entries::Charges::BankTransfer.entry_type)
             .where(payment_method: payment_method)
             .order(created_at: :desc)
-            .first
+          if entry_id
+            scope.find(entry_id)
+          else
+            scope.first
+          end
         end
 
         unless entry
@@ -74,12 +79,12 @@ module PaymentCore
         entry.request_verification(request_params)
         entry
       end
-
-
+      action_access :request_verification, :public
       params :verify_params do
         [:payable_id, :payable_type, :accepted, :verified_by, :verified_at]
       end
 
+      action_access :verify, :private
       action :verify do |params, *args|
         payable = params[:payable] ||
         if !payable.class.try(:payable?) && params[:payable_type].present? && params[:payable_id].present?

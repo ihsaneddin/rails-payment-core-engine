@@ -2,7 +2,7 @@ module PaymentCore
   module Entries
     module Charges
       class BankTransfer < ::PaymentCore::Entries::Charge
-        self.entry_type = "charge_bank_transfer"
+        self.entry_type = "charge"
 
         verification default: false do
           required_condition do

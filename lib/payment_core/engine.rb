@@ -19,6 +19,13 @@ module PaymentCore
       end
     end
 
+    config.before_initialize do |app|
+      locales_path = Rails.root.join("lib/payment_core/config/locales")
+      if locales_path.exist?
+        app.config.i18n.load_path += Dir[locales_path.join("**/*.yml")]
+      end
+    end
+
     config.to_prepare do
       Rails.autoloaders.main.eager_load_namespace(::PaymentCore::Models)
       Rails.autoloaders.main.eager_load_namespace(::PaymentCore)

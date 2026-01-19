@@ -151,9 +151,6 @@ module PaymentCore
                 event :accept do
                   transition [:verification_pending] => :succeeded
                 end
-                 after_failure do |entry, transition|
-                  puts entry.errors.messages.full_messages
-                end
               end
 
               before_state_transition :verification, to: :verification_pending do |request_params|

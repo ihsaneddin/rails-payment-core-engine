@@ -15,6 +15,14 @@ module PaymentCore
 
         module HelperMethods
 
+          def payment_method_class
+            unless @payment_method_class
+              @payment_method_class = instance_exec(class_context.payment_method_type, &class_context.payment_method_class_finder)
+              raise ::ActiveRecord::RecordNotFound unless @payment_method_class
+            end
+            @payment_method_class
+          end
+
           def processor_action?
             route.options[:processor_action]
           end

@@ -192,7 +192,12 @@ module PaymentCore
               end
               grape_api_resource "payment_core", default: true do
                 query_scope do |query_scope, api|
-                  api.current_holder.payment_method_candidates
+                  #api.current_holder.payment_method_candidates
+                  if api.route.options[:action_name] == "update"
+                    api.current_holder.payment_methods
+                  else
+                    api.current_holder.payment_method_candidates
+                  end
                 end
                 resource_params_attributes do
                   [
