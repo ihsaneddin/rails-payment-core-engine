@@ -1,7 +1,7 @@
 module PaymentCore
   module Grape
     module Holder
-      class PaymentMethods < Base
+      class PaymentMethods < ::PaymentCore::Grape::Holder::Base
 
         add_resource_actions :action
 
@@ -20,7 +20,7 @@ module PaymentCore
           builder.is_a?(Proc) ? instance_exec(context_opts, &builder) : builder
         end
 
-        include PaymentCore::Grape::Helpers::PaymentMethods
+        include ::PaymentCore::Grape::Helpers::PaymentMethods
 
         fetch_resource_and_collection! do
           model_klass do

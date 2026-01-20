@@ -1,5 +1,9 @@
 module PaymentCore
   module Grape
+    autoload :Holder, "payment_core/grape/holder"
+    autoload :Helpers, "payment_core/grape/helpers"
+    autoload :Presenters, "payment_core/grape/presenters"
+
     class Base < ::Grape::API
 
       use_plugins_grape(PaymentCore.config.grape_api)
