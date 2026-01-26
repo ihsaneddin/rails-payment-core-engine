@@ -60,7 +60,8 @@ module PaymentCore
                 end
               end
             end
-            klass.resource "#{entry_name}/:id" do
+            singular_entry_name = entry_name.to_s.singularize
+            klass.resource "#{singular_entry_name}/:id" do
 
               if opts[:show]
                 get "", authorize: [:read, subject ], model_name: proc { model_klass }, action_name: "show" do

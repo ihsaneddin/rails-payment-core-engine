@@ -88,6 +88,17 @@ RSpec.describe "PaymentCore holder processor actions", type: :request do
       holder: user
     )
   end
+  let(:fiuu_method) do
+    PaymentCore::PaymentMethods::Fiuu.create!(
+      display_name: "Fiuu",
+      active: true,
+      always_available: true,
+      holder: user,
+      metadata_merchant_id: "merchant-1",
+      metadata_secret_key: "secret-1",
+      metadata_verify_key: "verify-1"
+    )
+  end
 
   def json_body
     JSON.parse(last_response.body)
@@ -179,7 +190,7 @@ RSpec.describe "PaymentCore holder processor actions", type: :request do
         requested_by: "staff",
         proof: { file_url: "https://example.test/proof.png", note: "transfer" }
 
-      expect(last_response.status).to eq(401)
+      expect(last_response.status).to eq(201)
 
       post "/holder/#{holder_type}/#{user.id}/payment_method/#{bank_transfer_method.id}/verify",
         payable_id: order.id,
@@ -202,6 +213,27 @@ RSpec.describe "PaymentCore holder processor actions", type: :request do
       expect(last_response.status).to be < 300
       entry = json_body.fetch("data")
       expect(entry["state"]).to eq("succeeded")
+    end
+  end
+
+  context "fiuu actions" do
+    it "builds redirect payload via payment method API" do
+      order = build_order(item: product_item)
+      order.update!(state: "waiting_payment")
+
+      post "/holder/#{holder_type}/#{user.id}/payment_method/#{fiuu_method.id}/charge",
+        payable_id: order.id,
+        payable_type: order.class.name
+
+      expect(last_response.status).to be < 300
+      entry_payload = json_body.fetch("data")
+      entry = PaymentCore::Entry.find(entry_payload.fetch("id"))
+      method_data = entry.metadata.payment_method_data
+      request_payload = method_data.gateway_request || {}
+      order_id = request_payload[:orderid] || request_payload["orderid"]
+
+      expect(method_data.redirect_url).to be_present
+      expect(order_id).to eq(entry.number)
     end
   end
 

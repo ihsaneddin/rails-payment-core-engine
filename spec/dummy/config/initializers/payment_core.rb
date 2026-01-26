@@ -67,6 +67,11 @@ PaymentCore.setup do |config|
 #       pagination.include_total=true
 #       paginator=:pagy
 #     end
+    config.payment_method do
+      credentials_encryption_key do
+        Rails.application.credentials.secret_key_base || ENV['SECRET_KEY_BASE']
+      end
+    end
   end
 
 end

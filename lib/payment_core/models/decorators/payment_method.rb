@@ -8,6 +8,7 @@ module PaymentCore
         autoload :Object, "payment_core/models/decorators/payment_method/object"
         autoload :AutomaticCapture, "payment_core/models/decorators/payment_method/automatic_capture"
         autoload :Cancelable, "payment_core/models/decorators/payment_method/cancelable"
+        autoload :Credentials, "payment_core/models/decorators/payment_method/credentials"
         autoload :Expirable, "payment_core/models/decorators/payment_method/expirable"
         autoload :ExternalReference, "payment_core/models/decorators/payment_method/external_reference"
         autoload :IntentDriven, "payment_core/models/decorators/payment_method/intent_driven"

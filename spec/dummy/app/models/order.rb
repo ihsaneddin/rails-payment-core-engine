@@ -17,6 +17,15 @@ class Order < OrderCore::Order
     entry_requirements do
       bank_transfer_charge_requires_proof true
       bank_transfer_charge_requires_verification true
+      fiuu_charge_payment_method_data do
+        value do
+          {
+            email: customer&.email,
+            name: customer&.name,
+            phone: customer&.phone_number
+          }
+        end
+      end
     end
   end
 

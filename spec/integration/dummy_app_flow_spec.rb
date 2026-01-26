@@ -4,6 +4,7 @@ RSpec.describe "PaymentCore dummy app flows" do
   before(:all) do
     Order; LineItem; User; Product; PaymentPackageProductValue
     Product::Item; Product::Service; Product::PaymentPackage
+    PaymentCore::Attributes::Entries::MethodData::FiuuMethod
   end
 
   before(:each) do
@@ -165,6 +166,33 @@ RSpec.describe "PaymentCore dummy app flows" do
     expect(entry.errors).to be_present
     expect(entry.state).not_to eq("succeeded")
     expect(entry.components.sum(&:amount)).to be < entry.amount
+  end
+
+  it "builds fiuu redirect payload and url" do
+    order = Order.create!(customer: customer, name: "fiuu-order", state: "cart")
+    order.line_item_line_items.create!(item: product_item, quantity: 1, use_item_data: true)
+    order.update!(state: "waiting_payment")
+
+    payment_method = PaymentCore::PaymentMethods::Fiuu.create!(
+      display_name: "Fiuu",
+      active: true,
+      always_available: true,
+      metadata_merchant_id: "merchant-1",
+      metadata_secret_key: "secret-1",
+      metadata_verify_key: "verify-1"
+    )
+    order.reload
+    context = build_context(order)
+    entry = payment_method.processor(payer: customer, context: context).charge(
+      payable: order
+    )
+
+    method_data = entry.metadata.payment_method_data
+    payload = method_data.gateway_request || {}
+    order_id = payload[:orderid] || payload["orderid"]
+
+    expect(method_data.redirect_url).to be_present
+    expect(order_id).to eq(entry.number)
   end
 
   it "creates api scenario orders" do

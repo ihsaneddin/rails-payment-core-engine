@@ -37,7 +37,7 @@ module PaymentCore
         end
 
         def webhook_action method_name, &block
-          annotate_method("webhook_#{method_name}",to_sym, webhook_action: true, &block)
+          annotate_method("webhook_#{method_name}".to_sym, webhook_action: true, &block)
         end
 
         def action_access method_name, *accesses, prefix: nil
@@ -201,6 +201,7 @@ module PaymentCore
     require "payment_core/processors/base"
     require "payment_core/processors/cash"
     require "payment_core/processors/bank_transfer"
+    require "payment_core/processors/fiuu"
 
   end
 end

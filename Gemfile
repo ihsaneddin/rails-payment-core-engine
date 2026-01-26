@@ -10,6 +10,8 @@ group :development, :test do
   gem 'pg'
   gem 'byebug'
   gem 'rspec-rails'
+  gem 'webmock'
+  gem 'dotenv-rails'
 end
 
 gem "sprockets-rails"

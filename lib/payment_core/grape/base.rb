@@ -3,6 +3,7 @@ module PaymentCore
     autoload :Holder, "payment_core/grape/holder"
     autoload :Helpers, "payment_core/grape/helpers"
     autoload :Presenters, "payment_core/grape/presenters"
+    autoload :Webhooks, "payment_core/grape/webhooks"
 
     class Base < ::Grape::API
 
@@ -19,6 +20,7 @@ module PaymentCore
       resource_context("payment_core")
 
       mount ::PaymentCore::Grape::Holder::Base
+      mount ::PaymentCore::Grape::Webhooks.draw
 
 
     end

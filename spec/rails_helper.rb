@@ -66,9 +66,10 @@ RSpec.configure do |config|
 
   config.before(:suite) do
     PaymentCore
+    PaymentCore::Attributes::Entries::MethodData::FiuuMethod
+    PaymentCore.config.payment_method.credentials_encryption_key("0123456789abcdef0123456789abcdef")
   end
 
   config.infer_spec_type_from_file_location!
   config.filter_rails_from_backtrace!
 end
-

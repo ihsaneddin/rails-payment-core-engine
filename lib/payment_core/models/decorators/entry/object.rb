@@ -1,3 +1,5 @@
+require "securerandom"
+
 module PaymentCore
   module Models
     module Decorators
@@ -328,6 +330,13 @@ module PaymentCore
                 validates :payment_method, presence: true
                 validates :amount, presence: true, numericality: { greater_than_or_equal_to: 0, allow_blank: true }
                 validates :currency, presence: true
+              end
+
+              validates :number, uniqueness: true, if: proc { |record| record.number.present? }
+              validates :payable_transaction_id, uniqueness: true, if: proc { |record| record.payable_transaction_id.present? }
+
+              before_validation do
+                self.number = SecureRandom.hex(12) if number.blank?
               end
               with_options if: :payment_method do
                 validate do

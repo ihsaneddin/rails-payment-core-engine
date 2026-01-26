@@ -41,7 +41,7 @@ module PaymentCore
           end
 
           def processor_action_arguments
-            permitted = processor.params_for(processor_action_name.to_sym)
+            permitted = processor.params_for((params[:processor_action] || "action").to_sym, type: processor_collective_action? ? :collective : nil)
             permitted = posts.permit(*permitted)
             opts = ::PaymentCore.config.payment_method.processor_action_params
             args = [permitted, given_context]
@@ -55,7 +55,12 @@ module PaymentCore
           end
 
           def processor_action_accesses
-            class_context.try(:processor_action_accesses) || []
+            klass = class_context
+            if klass && klass <= ::PaymentCore::Grape::Holder::PaymentMethods
+              ::PaymentCore::Grape::Holder::PaymentMethods.processor_action_accesses || []
+            else
+              klass.try(:processor_action_accesses) || []
+            end
           end
 
           def processor
