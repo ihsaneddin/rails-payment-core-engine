@@ -95,8 +95,9 @@ module PaymentCore
       def build_redirect_payload(payment_method_data:, amount:, currency:, description:, verify_key:)
         method_data_hash = normalize_method_data(payment_method_data)
         amount = format_amount(amount)
-        order_id = method_data_hash[:order_id].presence || SecureRandom.uuid
+        order_id = method_data_hash[:order_id]
         use_extended = method_data_hash[:extended_vcode].present? || method_data_hash[:mp_extended_vcode].present?
+        raise "order_id is required for vcode" if order_id.blank?
         vcode_seed = "#{amount}#{merchant_id}#{order_id}"
         vcode_seed = "#{vcode_seed}#{currency}" if use_extended
         vcode = Digest::MD5.hexdigest("#{vcode_seed}#{verify_key}")
@@ -107,28 +108,28 @@ module PaymentCore
           orderid: order_id,
           bill_name: method_data_hash[:bill_name],
           bill_email: method_data_hash[:bill_email],
-          bill_phone: method_data_hash[:bill_phone],
+          bill_mobile: method_data_hash[:bill_mobile] || method_data_hash[:bill_phone],
           bill_desc: method_data_hash[:bill_desc] || description,
           country: method_data_hash[:country] || currency,
           vcode: vcode,
           currency: currency,
           returnurl: method_data_hash[:return_url],
-          callbackurl: method_data_hash[:callback_url],
-          notifyurl: method_data_hash[:notify_url]
+          callbackurl: method_data_hash[:callback_url] || method_data_hash[:notify_url]
         }.compact
         payload[:mp_extended_vcode] = 1 if use_extended
         [payload, { order_id: order_id, vcode: vcode }]
       end
 
       def redirect_path(payment_method_data, enabled_channels: nil)
-        method_data_hash = normalize_method_data(payment_method_data)
-        code = method_data_hash[:payment_method_code].presence
-        if code.blank? && enabled_channels.present?
-          codes = Array(enabled_channels).compact
-          code = codes.length == 1 ? codes.first : "ALL"
-        end
-        code ||= "ALL"
-        "/RMS/pay/#{merchant_id}/#{code}"
+        # method_data_hash = normalize_method_data(payment_method_data)
+        # code = method_data_hash[:payment_method_code].presence
+        # if code.blank? && enabled_channels.present?
+        #   codes = Array(enabled_channels).compact
+        #   code = codes.length == 1 ? codes.first : "ALL"
+        # end
+        # code ||= "ALL"
+        # "/RMS/pay/#{merchant_id}/#{code}"
+        "/RMS/pay/#{merchant_id}/"
       end
 
       def status_payload(payment_method_data)

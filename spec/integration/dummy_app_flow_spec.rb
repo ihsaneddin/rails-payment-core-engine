@@ -46,7 +46,7 @@ RSpec.describe "PaymentCore dummy app flows" do
   def build_context(payable)
     PaymentCore.config.payment_method.availability_context_class_constant.new(
       regions: ["ID"],
-      currencies: ["RM"],
+      currencies: ["MYR"],
       use_cases: ["checkout"],
       payables: [payable]
     )
@@ -58,7 +58,7 @@ RSpec.describe "PaymentCore dummy app flows" do
     cash.processor(payer: customer, context: context).charge(
       amount: order.total_amount,
       payable: order,
-      currency: "RM",
+      currency: "MYR",
       metadata: {
         payment_method_data: {}
       }
@@ -115,7 +115,7 @@ RSpec.describe "PaymentCore dummy app flows" do
     entry = package_method.processor.charge(
       amount: order.total_amount,
       payable: order,
-      currency: "RM",
+      currency: "MYR",
       metadata: { payment_method_data: {} }
     )
     expect(entry).to be_a(PaymentCore::Entries::Wrapper)
@@ -135,7 +135,7 @@ RSpec.describe "PaymentCore dummy app flows" do
     entry = package_method.processor.charge(
       amount: order.total_amount,
       payable: order,
-      currency: "RM",
+      currency: "MYR",
       metadata: { payment_method_data: {} }
     )
 
@@ -158,7 +158,7 @@ RSpec.describe "PaymentCore dummy app flows" do
     entry = package_method.processor.charge(
       amount: order.total_amount,
       payable: order,
-      currency: "RM",
+      currency: "MYR",
       metadata: { payment_method_data: {} }
     )
 

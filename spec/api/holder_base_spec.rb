@@ -23,7 +23,7 @@ RSpec.describe "PaymentCore holder API", type: :request do
       payer: user,
       amount: 100,
       payment_method_amount: 100,
-      currency: "RM"
+      currency: "MYR"
     )
   end
 

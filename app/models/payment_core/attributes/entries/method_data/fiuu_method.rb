@@ -11,12 +11,14 @@ module PaymentCore
           attribute :vcode, :string
           attribute :skey, :string
           attribute :redirect_url, :string
+          attribute :redirect_path, :string
           attribute :status, :string
           attribute :flow, :string
           attribute :payment_method_code, :string
           attribute :bill_name, :string
           attribute :bill_email, :string
           attribute :bill_phone, :string
+          attribute :bill_mobile, :string
           attribute :bill_desc, :string
           attribute :country, :string
           attribute :return_url, :string

@@ -27,7 +27,7 @@ RSpec.describe PaymentCore::Processors::Fiuu do
   let(:context) do
     PaymentCore.config.payment_method.availability_context_class_constant.new(
       regions: ["ID"],
-      currencies: ["RM"],
+      currencies: ["MYR"],
       use_cases: ["checkout"],
       payables: [payable]
     )

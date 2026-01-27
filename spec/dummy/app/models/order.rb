@@ -10,7 +10,7 @@ class Order < OrderCore::Order
     #   components = Array(payable_components).flatten
     #   payable_charge_entries.where(payable: components).succeeded.sum(:amount)
     # end
-    currency "RM"
+    currency "MYR"
     components do
       line_items
     end
@@ -22,7 +22,8 @@ class Order < OrderCore::Order
           {
             email: customer&.email,
             name: customer&.name,
-            phone: customer&.phone_number
+            phone: customer&.phone_number,
+            country: "MY"
           }
         end
       end
@@ -66,7 +67,7 @@ class Order < OrderCore::Order
 
     PaymentCore::PaymentIntent.create!(
       payable: self,
-      currency: payable_currency || "RM"
+      currency: payable_currency || "MYR"
     )
   end
 

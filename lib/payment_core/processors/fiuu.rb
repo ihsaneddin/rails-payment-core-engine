@@ -131,6 +131,7 @@ module PaymentCore
         payment_method_data[:bill_name] ||= payable_data[:name] || payable_data["name"]
         payment_method_data[:bill_email] ||= payable_data[:email] || payable_data["email"]
         payment_method_data[:bill_phone] ||= payable_data[:phone] || payable_data["phone"]
+        payment_method_data[:country] ||= payable_data[:country] || payable_data["country"]
         payment_method_data[:bill_name] ||= payer.respond_to?(:name) ? payer.name : nil
         payment_method_data[:bill_email] ||= payer.respond_to?(:email) ? payer.email : nil
         payment_method_data[:bill_phone] ||= if payer.respond_to?(:phone)
@@ -138,6 +139,7 @@ module PaymentCore
         elsif payer.respond_to?(:phone_number)
           payer.phone_number
         end
+        payment_method_data[:bill_mobile] ||= payment_method_data[:bill_phone]
         payment_method_data[:return_url] ||= params[:return_url] || payment_method.metadata_return_url
         payment_method_data[:callback_url] ||= payment_method.metadata_callback_url
         payment_method_data[:notify_url] ||= payment_method.metadata_notify_url
@@ -175,8 +177,13 @@ module PaymentCore
           method_data,
           enabled_channels: payment_method.enabled_channel_codes
         )
-        method_data.redirect_url = gateway_path.present? ? gateway.build_url(gateway_path) : nil
+        method_data.redirect_path = gateway_path
         method_data.redirect_payload = payload
+        method_data.redirect_url = if gateway_path.present?
+          query = payload.present? ? URI.encode_www_form(payload) : ""
+          url = gateway.build_url(gateway_path)
+          query.present? ? "#{url}?#{query}" : url
+        end
         apply_gateway_response(method_data, response: nil, payload: payload, payload_meta: payload_meta)
         entry.save
       end

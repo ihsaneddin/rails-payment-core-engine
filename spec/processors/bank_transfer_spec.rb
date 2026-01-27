@@ -16,7 +16,7 @@ RSpec.describe PaymentCore::Processors::BankTransfer do
       bank_code: "BANK-EX",
       bank_account_name: "Test Account",
       bank_account_number: "1234567890",
-      default_currency: "RM",
+      default_currency: "MYR",
       active: true,
       always_available: true
     )
@@ -24,7 +24,7 @@ RSpec.describe PaymentCore::Processors::BankTransfer do
   let(:context) do
     PaymentCore.config.payment_method.availability_context_class_constant.new(
       regions: ["ID"],
-      currencies: ["RM"],
+      currencies: ["MYR"],
       use_cases: ["checkout"],
       payables: [payable]
     )

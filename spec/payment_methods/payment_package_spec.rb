@@ -40,7 +40,7 @@ RSpec.describe PaymentCore::PaymentMethods::PaymentPackage do
   def build_context(payable)
     PaymentCore.config.payment_method.availability_context_class_constant.new(
       regions: ["ID"],
-      currencies: ["RM"],
+      currencies: ["MYR"],
       use_cases: ["checkout"],
       payables: [payable]
     )
@@ -52,7 +52,7 @@ RSpec.describe PaymentCore::PaymentMethods::PaymentPackage do
     cash.processor(payer: customer, context: context).charge(
       amount: order.total_amount,
       payable: order,
-      currency: "RM",
+      currency: "MYR",
       metadata: { payment_method_data: {} }
     )
   end

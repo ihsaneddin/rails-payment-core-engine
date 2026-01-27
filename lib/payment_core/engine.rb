@@ -28,6 +28,7 @@ module PaymentCore
 
     config.to_prepare do
       Rails.autoloaders.main.eager_load_namespace(::PaymentCore::Models)
+      Rails.autoloaders.main.eager_load_namespace(::PaymentCore::Gateways)
       Rails.autoloaders.main.eager_load_namespace(::PaymentCore)
     end
 

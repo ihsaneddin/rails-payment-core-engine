@@ -73,7 +73,7 @@ RSpec.describe "PaymentCore holder processor actions", type: :request do
       bank_code: "BANK-EX",
       bank_account_name: "Test Account",
       bank_account_number: "1234567890",
-      default_currency: "RM",
+      default_currency: "MYR",
       active: true,
       always_available: true,
       holder: user
@@ -114,7 +114,7 @@ RSpec.describe "PaymentCore holder processor actions", type: :request do
   def build_context(payable)
     PaymentCore.config.payment_method.availability_context_class_constant.new(
       regions: ["ID"],
-      currencies: ["RM"],
+      currencies: ["MYR"],
       use_cases: ["checkout"],
       payables: [payable]
     )
@@ -126,7 +126,7 @@ RSpec.describe "PaymentCore holder processor actions", type: :request do
     cash.processor(payer: user, context: context).charge(
       amount: order.total_amount,
       payable: order,
-      currency: "RM",
+      currency: "MYR",
       metadata: { payment_method_data: {} }
     )
   end
@@ -209,7 +209,7 @@ RSpec.describe "PaymentCore holder processor actions", type: :request do
       post "/holder/#{holder_type}/#{user.id}/payment_method/#{cash_method.id}/charge",
         payable_id: order.id,
         payable_type: order.class.name,
-        currency: "RM"
+        currency: "MYR"
       expect(last_response.status).to be < 300
       entry = json_body.fetch("data")
       expect(entry["state"]).to eq("succeeded")
@@ -245,7 +245,7 @@ RSpec.describe "PaymentCore holder processor actions", type: :request do
       post "/holder/#{holder_type}/#{user.id}/payment_method/#{payment_package_method.id}/charge",
         payable_id: order.id,
         payable_type: order.class.name,
-        currency: "RM"
+        currency: "MYR"
 
       expect(last_response.status).to be < 300
       entry = json_body.fetch("data")
@@ -262,7 +262,7 @@ RSpec.describe "PaymentCore holder processor actions", type: :request do
         post "/holder/#{holder_type}/#{user.id}/payment_method/#{payment_package_method.id}/charge",
           payable_id: order.id,
           payable_type: order.class.name,
-          currency: "RM"
+          currency: "MYR"
         expect(last_response.status).to eq(401)
       ensure
         PaymentCore::Grape::Holder::PaymentMethods.processor_action_accesses = original_accesses
@@ -278,7 +278,7 @@ RSpec.describe "PaymentCore holder processor actions", type: :request do
       post "/holder/#{holder_type}/#{user.id}/payment_method/#{payment_package_method.id}/charge",
         payable_id: order.id,
         payable_type: order.class.name,
-        currency: "RM"
+        currency: "MYR"
       expect(last_response.status).to eq(422)
       expect(json_body.fetch("error")).to eq("Unprocessable entity")
     end
@@ -290,7 +290,7 @@ RSpec.describe "PaymentCore holder processor actions", type: :request do
       post "/holder/#{holder_type}/#{user.id}/payment_method/#{payment_package_method.id}/charge",
         payable_id: order.id,
         payable_type: order.class.name,
-        currency: "RM"
+        currency: "MYR"
 
       expect(last_response.status).to eq(422)
       expect(json_body.fetch("error")).to eq("Unprocessable entity")
@@ -303,7 +303,7 @@ RSpec.describe "PaymentCore holder processor actions", type: :request do
       post "/holder/#{holder_type}/#{user.id}/payment_method/#{payment_package_method.id}/charge",
         payable_id: order.id,
         payable_type: order.class.name,
-        currency: "RM"
+        currency: "MYR"
 
       expect(last_response.status).to be < 300
       wrapper = json_body.fetch("data")
@@ -324,7 +324,7 @@ RSpec.describe "PaymentCore holder processor actions", type: :request do
       post "/holder/#{holder_type}/#{user.id}/payment_method/#{payment_package_method.id}/charge",
         payable_id: order.id,
         payable_type: order.class.name,
-        currency: "RM"
+        currency: "MYR"
 
       expect(last_response.status).to be < 300
       wrapper = json_body.fetch("data")
@@ -382,7 +382,7 @@ RSpec.describe "PaymentCore holder processor actions", type: :request do
         payable_id: order.id,
         payable_type: order.class.name,
         payment_method_ids: payment_package_methods.map(&:id),
-        currency: "RM",
+        currency: "MYR",
         context: context_payload
       expect(last_response.status).to be < 300
       entry = json_body.fetch("data")
@@ -417,7 +417,7 @@ RSpec.describe "PaymentCore holder processor actions", type: :request do
         payable_id: order.id,
         payable_type: order.class.name,
         payment_method_ids: payment_package_methods.map(&:id),
-        currency: "RM",
+        currency: "MYR",
         context: context_payload
 
       expect(last_response.status).to eq(422)
