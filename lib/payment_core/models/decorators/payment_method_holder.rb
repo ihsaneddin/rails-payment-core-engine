@@ -24,7 +24,7 @@ module PaymentCore
             },
             payment_method_candidates: proc {
               payment_methods.active.or(::PaymentCore::PaymentMethod.global.active.always_available)
-              .includes(::PaymentCore::PaymentMethod.reference_classes.keys.map(&:to_sym))
+              .includes((::PaymentCore::PaymentMethod.try(:reference_classes)|| {}).keys.map(&:to_sym))
             },
             available_payment_method: proc { |context: nil|
               payment_method_candidates.select do |pm|

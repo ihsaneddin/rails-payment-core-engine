@@ -49,7 +49,7 @@ module PaymentCore
     class << self
 
       def load_sidekiq_scheduler(cfg)
-        if ::PaymentCore.config.sidekig.scheduler_enabled
+        if ::PaymentCore.config.sidekiq.scheduler_enabled
           sidekiq_scheduler_version = SidekiqScheduler::VERSION.to_i
           schedule_file = PaymentCore::Engine.root.join('config', 'payment_core_schedule.yml')
           return unless File.exist?(schedule_file)
