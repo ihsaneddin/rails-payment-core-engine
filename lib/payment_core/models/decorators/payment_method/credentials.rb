@@ -67,8 +67,12 @@ module PaymentCore
           end
 
           module InstanceMethods
-
-
+            def as_json(options = nil)
+              data = super(options)
+              fields = credentials_config.fields.keys
+              return data unless data.is_a?(Hash) && fields.any?
+              data.except(*fields.map{|field| "metadata_#{field}" })
+            end
           end
 
           extend ::PaymentCore::Models::Decorators::PaymentMethod::Object
