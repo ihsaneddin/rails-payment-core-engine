@@ -4,7 +4,7 @@ RSpec.describe "PaymentCore holder API", type: :request do
   include Rack::Test::Methods
 
   def app
-    PaymentCore::Grape::Base
+    PaymentCore::Grape::Base.draw
   end
 
   let(:user) { User.create!(email: "user@example.com", name: "User") }

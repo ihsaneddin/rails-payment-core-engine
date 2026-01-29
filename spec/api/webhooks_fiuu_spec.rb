@@ -4,7 +4,7 @@ RSpec.describe "PaymentCore Fiuu webhooks", type: :request do
   include Rack::Test::Methods
 
   def app
-    PaymentCore::Grape::Base
+    PaymentCore::Grape::Base.draw
   end
 
   before(:all) do

@@ -1,10 +1,5 @@
 module PaymentCore
   module Grape
-    autoload :Holder, "payment_core/grape/holder"
-    autoload :Helpers, "payment_core/grape/helpers"
-    autoload :Presenters, "payment_core/grape/presenters"
-    autoload :Webhooks, "payment_core/grape/webhooks"
-
     class Base < ::Grape::API
 
       use_plugins_grape(PaymentCore.config.grape_api)
@@ -19,8 +14,13 @@ module PaymentCore
 
       resource_context("payment_core")
 
-      mount ::PaymentCore::Grape::Holder::Base
-      mount ::PaymentCore::Grape::Webhooks.draw
+      def self.draw(&block)
+        klass = duplicate(self)
+        klass.class_exec(&block) if block_given?
+        klass.mount ::PaymentCore::Grape::Holder::Base.draw
+        klass.mount ::PaymentCore::Grape::Webhooks.draw
+        klass
+      end
 
 
     end

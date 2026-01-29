@@ -80,46 +80,46 @@ namespace :payment_core do
       wait_seconds = (ENV["FIUU_WAIT_SECONDS"] || "60").to_i
       puts "Waiting #{wait_seconds}s before simulating webhook..."
       sleep wait_seconds if wait_seconds.positive?
-      #
-      # status = ENV["FIUU_SIMULATE_STATUS"] || "00"
-      # tran_id = "TX-#{SecureRandom.hex(6)}"
-      # paydate = Time.now.strftime("%Y%m%d%H%M%S")
-      # appcode = "APP-1"
-      # nbcb = "2"
-      # domain = merchant_id
-      # payload = entry.metadata.payment_method_data.redirect_payload || {}
-      # amount = payload[:amount] || payload["amount"] || entry.amount.to_s
-      # currency = payload[:currency] || payload["currency"] || entry.currency
-      # order_id = payload[:orderid] || payload["orderid"] || entry.number
-      #
-      # key0 = Digest::MD5.hexdigest("#{tran_id}#{order_id}#{status}#{domain}#{amount}#{currency}")
-      # skey = Digest::MD5.hexdigest("#{paydate}#{domain}#{key0}#{appcode}#{secret_key}")
-      #
-      # webhook_params = {
-      #   orderid: order_id,
-      #   tranID: tran_id,
-      #   status: status,
-      #   amount: amount,
-      #   currency: currency,
-      #   paydate: paydate,
-      #   appcode: appcode,
-      #   skey: skey,
-      #   domain: domain,
-      #   nbcb: nbcb
-      # }
-      #
-      # require "net/http"
-      # require "uri"
-      # webhook_url = "#{webhook_host}#{webhook_path}"
-      # uri = URI.parse(webhook_url)
-      # req = Net::HTTP::Post.new(uri)
-      # req["Accept"] = "application/json"
-      # req["Content-Type"] = "application/x-www-form-urlencoded"
-      # req.set_form_data(webhook_params)
-      # res = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https") do |http|
-      #   http.request(req)
-      # end
-      # puts "Webhook simulated: #{res.code} #{res.body}"
+
+      status = ENV["FIUU_SIMULATE_STATUS"] || "00"
+      tran_id = "TX-#{SecureRandom.hex(6)}"
+      paydate = Time.now.strftime("%Y%m%d%H%M%S")
+      appcode = "APP-1"
+      nbcb = "2"
+      domain = merchant_id
+      payload = entry.metadata.payment_method_data.redirect_payload || {}
+      amount = payload[:amount] || payload["amount"] || entry.amount.to_s
+      currency = payload[:currency] || payload["currency"] || entry.currency
+      order_id = payload[:orderid] || payload["orderid"] || entry.number
+
+      key0 = Digest::MD5.hexdigest("#{tran_id}#{order_id}#{status}#{domain}#{amount}#{currency}")
+      skey = Digest::MD5.hexdigest("#{paydate}#{domain}#{key0}#{appcode}#{secret_key}")
+
+      webhook_params = {
+        orderid: order_id,
+        tranID: tran_id,
+        status: status,
+        amount: amount,
+        currency: currency,
+        paydate: paydate,
+        appcode: appcode,
+        skey: skey,
+        domain: domain,
+        nbcb: nbcb
+      }
+
+      require "net/http"
+      require "uri"
+      webhook_url = "#{webhook_host}#{webhook_path}"
+      uri = URI.parse(webhook_url)
+      req = Net::HTTP::Post.new(uri)
+      req["Accept"] = "application/json"
+      req["Content-Type"] = "application/x-www-form-urlencoded"
+      req.set_form_data(webhook_params)
+      res = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https") do |http|
+        http.request(req)
+      end
+      puts "Webhook simulated: #{res.code} #{res.body}"
 
       entry.reload
       puts "Final state: #{entry.state}"
