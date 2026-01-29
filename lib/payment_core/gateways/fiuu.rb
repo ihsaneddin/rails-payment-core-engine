@@ -19,7 +19,7 @@ module PaymentCore
         timeout: DEFAULT_TIMEOUT,
         open_timeout: DEFAULT_OPEN_TIMEOUT,
         base_url: proc { Rails.env.production? ? "https://pay.fiuu.com" : "https://sandbox-payment.fiuu.com" },
-        api_base_url: proc { Rails.env.production? ? "https://api.e2pay.co.id" : "https://api.e2pay.co.id" },
+        api_base_url: proc { Rails.env.production? ? "https://api.fiuu.com" : "https://sandbox-api.fiuu.com" },
         mode: proc { Rails.env.production? ? "production" : "sandbox" },
         webhook_payload_filter: proc { |params|
           raw = params.respond_to?(:to_h) ? params.to_h : {}
@@ -27,6 +27,14 @@ module PaymentCore
           raw.each_with_object({}) do |(key, value), acc|
             k = key.to_s
             acc[k] = value if allowed.include?(k)
+          end
+        },
+        webhook_response: proc { |opts = {}|
+          entry = opts[:entry]
+          if entry&.payment_method&.metadata_ipn_enabled
+            "CBTOKEN:MPSTATOK"
+          else
+            { status: "ok" }
           end
         },
         entry_resolver: proc { |params|
@@ -143,6 +151,38 @@ module PaymentCore
         payload&.key?(:txID) ? "/RMS/query/q_by_tid.php" : "/RMS/query/q_by_oid.php"
       end
 
+      def entry_info(order_id: nil, transaction_id: nil, amount:, verify_key:, type: 2)
+        raise ArgumentError, "order_id or transaction_id is required" if order_id.blank? && transaction_id.blank?
+        raise ArgumentError, "amount is required" if amount.blank?
+        raise ArgumentError, "verify_key is required" if verify_key.blank?
+
+        amount = format_amount(amount)
+
+        if transaction_id.present?
+          skey = Digest::MD5.hexdigest("#{transaction_id}#{merchant_id}#{verify_key}#{amount}")
+          params = {
+            amount: amount,
+            txID: transaction_id,
+            domain: merchant_id,
+            skey: skey,
+            type: type
+          }.compact
+          response = post_form(api_url("/RMS/q_by_tid.php"), params: params)
+        else
+          skey = Digest::MD5.hexdigest("#{order_id}#{merchant_id}#{verify_key}#{amount}")
+          params = {
+            amount: amount,
+            oID: order_id,
+            domain: merchant_id,
+            skey: skey,
+            type: type
+          }.compact
+          response = post_form(api_url("/RMS/query/q_by_oid.php"), params: params)
+        end
+
+        normalize_response(response)
+      end
+
       def verify_webhook_signature(params, secret_key:, merchant_id:)
         skey = params[:skey] || params[:SKey] || params[:sKey]
         return false if skey.blank?
@@ -247,6 +287,14 @@ module PaymentCore
         base = "#{base}/" unless base.end_with?("/")
         "#{base}#{path}".gsub(%r{/+}, "/").sub(":/", "://")
       end
+
+      def api_url(path)
+        return path.to_s if path.to_s.start_with?("http")
+        base = api_base_url.to_s
+        base = "#{base}/" unless base.end_with?("/")
+        "#{base}#{path}".gsub(%r{/+}, "/").sub(":/", "://")
+      end
+
 
       def build_headers(headers, content_type)
         headers = headers.dup

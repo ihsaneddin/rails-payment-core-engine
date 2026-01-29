@@ -74,11 +74,45 @@ module PaymentCore
 
       action_access :status, :public
 
+      params :check_status_params do
+        [:entry_id]
+      end
+
+      action :check_status do |params, *args|
+        entry = ::PaymentCore::Entry
+          .joins(:payment_method)
+          .where(payment_core_payment_methods: { method_type: "fiuu" })
+          .find_by(id: params[:entry_id])
+        raise ::ActiveRecord::RecordNotFound unless entry
+
+        unless final_entry_state?(entry)
+          method_data = ensure_method_data(entry.metadata)
+          order_id = method_data.order_id || entry.number
+          transaction_id = method_data.transaction_id || entry.payable_transaction_id
+          amount = entry.payment_method_amount.presence || entry.amount
+          response = entry.payment_method.gateway.entry_info(
+            order_id: order_id,
+            transaction_id: transaction_id,
+            amount: amount,
+            verify_key: entry.payment_method.metadata_verify_key
+          )
+          apply_status_payload(entry: entry, payload: response, gateway_response: response)
+        end
+
+        entry
+      end
+
+      action_access :check_status, :public
+
       webhook_action :capture do |params, *args|
         entry = params[:entry]
         raise ::ActiveRecord::RecordNotFound unless entry
 
-        apply_webhook(entry: entry, params: params)
+        payload = params[:webhook_payload] || (params.to_h if params.respond_to?(:to_h)) || {}
+        method_data = ensure_method_data(entry.metadata)
+        method_data.last_webhook_attempt_at = Time.current
+        apply_status_payload(entry: entry, payload: payload)
+        entry.save if entry.changed?
         entry
       end
 
@@ -184,7 +218,7 @@ module PaymentCore
           url = gateway.build_url(gateway_path)
           query.present? ? "#{url}?#{query}" : url
         end
-        apply_gateway_response(method_data, response: nil, payload: payload, payload_meta: payload_meta)
+        apply_redirect_flow_payload(method_data, response: nil, payload: payload, payload_meta: payload_meta)
         entry.save
       end
 
@@ -207,7 +241,7 @@ module PaymentCore
         raise ::PaymentCore::Errors::ProcessorActionNotAllowed, "Fiuu direct flow is not supported yet"
       end
 
-      def apply_gateway_response(method_data, response:, payload: nil, payload_meta: nil)
+      def apply_redirect_flow_payload(method_data, response:, payload: nil, payload_meta: nil)
         method_data.gateway_request = payload if payload.present?
         payload = payload.deep_symbolize_keys if payload.respond_to?(:deep_symbolize_keys)
         payload_meta = payload_meta.deep_symbolize_keys if payload_meta.respond_to?(:deep_symbolize_keys)
@@ -235,14 +269,15 @@ module PaymentCore
       end
 
 
-      def apply_webhook(entry:, params:)
+      def apply_status_payload(entry:, payload:, gateway_response: nil)
         method_data = ensure_method_data(entry.metadata)
-        method_data.webhook_payload = params[:webhook_payload] || (params.to_h if params.respond_to?(:to_h))
-        method_data.status ||= params[:status] || params[:payment_status]
-        method_data.transaction_id ||= params[:tranID] || params[:transaction_id]
-        method_data.order_id ||= params[:orderid] || params[:order_id]
-        method_data.skey ||= params[:skey] || params[:SKey] || params[:sKey]
-        entry.payable_transaction_id ||= params[:tranID] || params[:transaction_id]
+        method_data.webhook_payload = payload if gateway_response.nil?
+        method_data.gateway_response = gateway_response if gateway_response
+        method_data.status ||= payload[:status] || payload[:StatCode] || payload[:statcode]
+        method_data.transaction_id ||= payload[:tranID] || payload[:TranID] || payload[:transaction_id] || payload[:tranid]
+        method_data.order_id ||= payload[:orderid] || payload[:OrderID] || payload[:order_id] || method_data.order_id
+        method_data.skey ||= payload[:skey] || payload[:SKey] || payload[:sKey]
+        entry.payable_transaction_id ||= method_data.transaction_id
 
         status = method_data.status.to_s.strip
         transitioned = false
@@ -251,9 +286,15 @@ module PaymentCore
           transitioned = entry.success
         when "11"
           transitioned = entry.failure
+        when "22"
+          transitioned = entry.process
         end
 
         entry.save if entry.changed? && !transitioned
+      end
+
+      def final_entry_state?(entry)
+        %w[succeeded failed canceled expired reversed disputed].include?(entry.state.to_s)
       end
 
     end

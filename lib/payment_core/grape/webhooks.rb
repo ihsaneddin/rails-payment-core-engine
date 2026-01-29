@@ -84,13 +84,20 @@ module PaymentCore
 
             desc "Payment gateway webhook"
             post do
-              processor.perform_with_access(
-                action_name: :webhook_capture,
-                accesses: class_context.processor_webhook_action_accesses,
-                action_arguments: webhook_action_arguments
-              )
+              response_payload = gateway.response(entry: entry, params: params, request: request) do
+                processor.perform_with_access(
+                  action_name: :webhook_capture,
+                  accesses: class_context.processor_webhook_action_accesses,
+                  action_arguments: webhook_action_arguments
+                )
+              end
 
-              { status: "ok" }
+              if response_payload.is_a?(String)
+                header "Content-Type", "text/plain"
+                response_payload
+              else
+                response_payload || { status: "ok" }
+              end
             end
           end
           klass

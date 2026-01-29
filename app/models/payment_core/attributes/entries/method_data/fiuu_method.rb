@@ -30,6 +30,7 @@ module PaymentCore
           attribute :gateway_response, ::PaymentCore::AttributeTypes::HashType.new
           attribute :webhook_payload, ::PaymentCore::AttributeTypes::HashType.new
           attribute :redirect_payload, ::PaymentCore::AttributeTypes::HashType.new
+          attribute :last_webhook_attempt_at, :datetime
 
         end
       end

@@ -35,7 +35,15 @@ RSpec.describe PaymentCore::Processors::Fiuu do
   let(:processor) { payment_method.processor(payer: payer, context: context) }
 
   it "builds redirect payload and URL without calling the gateway" do
+    now = Time.current
+    allow(PaymentCore::EntryWorker).to receive(:perform_at)
+
     entry = processor.charge(payable: payable)
+    expect(PaymentCore::EntryWorker).to have_received(:perform_at).with(
+      satisfy { |time| time.is_a?(Time) && time.between?(now + PaymentCore.config.payment_method.webhook_sla_seconds - 1.second, now + PaymentCore.config.payment_method.webhook_sla_seconds + 1.second) },
+      entry.id,
+      "check_status"
+    ).at_least(:once)
 
     expect(entry).to be_persisted
     method_data = entry.metadata.payment_method_data
@@ -55,5 +63,27 @@ RSpec.describe PaymentCore::Processors::Fiuu do
         payable: payable
       )
     end.to raise_error(PaymentCore::Errors::ProcessorActionNotAllowed)
+  end
+
+  it "updates entry state using check_status" do
+    entry = processor.charge(payable: payable)
+
+    response = {
+      StatCode: "00",
+      StatName: "captured",
+      TranID: "TX-OK",
+      OrderID: entry.number,
+      Amount: "100.00",
+      Domain: payment_method.metadata_merchant_id,
+      Currency: "MYR"
+    }
+
+    allow_any_instance_of(PaymentCore::Gateways::Fiuu).to receive(:entry_info).and_return(response)
+
+    processor.perform(:check_status, { entry_id: entry.id }, context)
+
+    entry.reload
+    expect(entry).to be_succeeded
+    expect(entry.payable_transaction_id).to eq("TX-OK")
   end
 end

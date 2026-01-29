@@ -21,6 +21,7 @@ module PaymentCore
         attribute :return_url, :string
         attribute :callback_url, :string
         attribute :notify_url, :string
+        attribute :ipn_enabled, :boolean, default: false
 
         validates :flow, inclusion: { in: %w[redirect direct], message: :invalid }
         validates :channels, store_model: true
@@ -36,6 +37,11 @@ module PaymentCore
       credentials fields: {
         :merchant_id => true, :secret_key => true, :verify_key => true
       }
+
+      entry_callback :after_create do |entry|
+        delay = ::PaymentCore.config.payment_method.webhook_sla_seconds.to_i
+        ::PaymentCore::EntryWorker.perform_at(Time.current + delay, entry.id, "check_status")
+      end
 
       after_initialize do
         next unless new_record?

@@ -23,13 +23,6 @@ module PaymentCore
 
           module Metadata
             extend ActiveSupport::Concern
-            def as_json(options = {})
-              data = super(options)
-              fields = self.class.respond_to?(:credentials_fields) ? self.class.credentials_fields : []
-              return data unless data.is_a?(Hash) && fields.any?
-              data.except(*fields.map(&:to_s))
-            end
-
           end
 
           module ClassMethods
@@ -52,9 +45,6 @@ module PaymentCore
                 )
                 metadata_class.validates field, presence: true if required
               end
-              metadata_class.define_singleton_method(:credentials_fields) do
-                base.credentials_config.fields.keys
-              end
               define_metadata_class(metadata_class)
               define_inheritable_singleton_method(:credentials?) { true }
               include InstanceMethods
@@ -71,7 +61,12 @@ module PaymentCore
               data = super(options)
               fields = credentials_config.fields.keys
               return data unless data.is_a?(Hash) && fields.any?
-              data.except(*fields.map{|field| "metadata_#{field}" })
+
+              metadata = data["metadata"]
+              if metadata.is_a?(Hash)
+                data["metadata"] = metadata.except(*fields.map(&:to_s))
+              end
+              data.except(*fields.map { |field| "metadata_#{field}" })
             end
           end
 

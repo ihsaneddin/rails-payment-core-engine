@@ -27,6 +27,7 @@ module PaymentCore
           open_timeout: nil,
           entry_resolver: proc { |*_args| nil },
           webhook_payload_filter: proc { |_params| {} },
+          webhook_response: proc { |_opts = {}| { status: "ok" } },
           signature_fields: nil,
           signature_builder: nil
         }
@@ -35,6 +36,11 @@ module PaymentCore
       def normalize_webhook_payload(request:, params:)
         return {} unless respond_to?(:config_webhook_payload_filter)
         config_webhook_payload_filter(params) || {}
+      end
+
+      def response(entry:, params:, request:)
+        yield if block_given?
+        config.webhook_response({ entry: entry, params: params, request: request }) || { status: "ok" }
       end
 
       module ClassMethods

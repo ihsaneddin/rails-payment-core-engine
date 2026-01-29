@@ -70,6 +70,7 @@ RSpec.describe "PaymentCore Fiuu webhooks", type: :request do
       secret_key: payment_method.metadata_secret_key
     )
 
+    now = Time.current
     post "/webhook/fiuu", {
       orderid: order_id,
       tranID: tran_id,
@@ -89,6 +90,7 @@ RSpec.describe "PaymentCore Fiuu webhooks", type: :request do
     expect(entry).to be_succeeded
     expect(entry.payable_transaction_id).to eq(tran_id)
     payload = entry.metadata.payment_method_data.webhook_payload
+    expect(entry.metadata.payment_method_data.last_webhook_attempt_at).to be_within(5.seconds).of(now)
     expect(payload[:orderid]).to eq(order_id)
     expect(payload[:tranID]).to eq(tran_id)
   end
