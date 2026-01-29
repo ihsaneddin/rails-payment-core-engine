@@ -14,7 +14,7 @@ module PaymentCore
       end
 
       rescue_from ::ActiveRecord::RecordNotFound do |e|
-        standard_not_found_error(message: "Not found")
+        error!({ message: "Not found", error: "Not Found" }, 404)
       end
 
       helpers do
