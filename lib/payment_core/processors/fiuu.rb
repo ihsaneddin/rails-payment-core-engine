@@ -128,7 +128,8 @@ module PaymentCore
           :paydate,
           :appcode,
           :skey,
-          :domain
+          :domain,
+          :nbcb
         ]
       end
 

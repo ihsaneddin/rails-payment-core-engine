@@ -83,7 +83,7 @@ module PaymentCore
           klass.resources "webhook/:gateway_type" do
 
             desc "Payment gateway webhook"
-            post do
+            route [:get, :post, :put] do
               response_payload = gateway.response(entry: entry, params: params, request: request) do
                 processor.perform_with_access(
                   action_name: :webhook_capture,

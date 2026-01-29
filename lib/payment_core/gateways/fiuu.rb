@@ -44,8 +44,8 @@ module PaymentCore
             tx_id = params[:tranID] || params[:transaction_id]
             entry = tx_id.present? ? ::PaymentCore::Entry.find_by(payable_transaction_id: tx_id) : nil
           end
-          return nil unless entry
-          return nil unless entry.payment_method&.method_type.to_s == "fiuu"
+          next nil unless entry
+          next nil unless entry.payment_method&.method_type.to_s == "fiuu"
 
           valid = entry.payment_method.gateway.verify_webhook_signature(
             params,
