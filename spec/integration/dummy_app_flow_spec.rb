@@ -66,7 +66,7 @@ RSpec.describe "PaymentCore dummy app flows" do
   end
 
   def top_up_accounts
-    order = Order.create!(customer: customer)
+    order = Order.create!(customer: customer, name: "anjing")
     order.line_item_line_items.create!(item: product_item, quantity: 1, use_item_data: true)
     order.line_item_line_items.create!(item: product_top_up_wallet, quantity: 1, use_item_data: true)
     order.line_item_line_items.create!(item: product_top_up_service_package, quantity: 1, use_item_data: true)

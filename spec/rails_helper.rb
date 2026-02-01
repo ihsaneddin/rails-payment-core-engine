@@ -11,6 +11,7 @@ require "rspec/rails"
 Dir[PaymentCore::Engine.root.join("spec/support/**/*.rb")].sort.each { |f| require f }
 Dir[PaymentCore::Engine.root.join("spec/dummy/lib/**/*.rb")].sort.each { |f| require f }
 Dir[PaymentCore::Engine.root.join("spec/dummy/app/subscribers/**/*.rb")].sort.each { |f| require f }
+require "payment_core/subscribers"
 
 begin
   ActiveRecord::Migration.maintain_test_schema!

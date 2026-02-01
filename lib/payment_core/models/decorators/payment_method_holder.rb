@@ -38,6 +38,14 @@ module PaymentCore
               type: proc {
                       name.demodulize.underscore
                     }
+            }),
+            events: plugins_config.build(**{
+              payment_method: plugins_config.build(**{
+                created: nil,
+                updated: nil,
+                saved: nil,
+                destroyed: nil
+              })
             })
           }
         end

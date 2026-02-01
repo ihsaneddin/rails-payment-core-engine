@@ -37,6 +37,7 @@ module PaymentCore
 
              base.inheritable_class_attribute :method_type, :allowed_entry_types, :direction, :requires_payable, :entry_method_data_defaults_config
              base.method_type = base.name.demodulize.underscore
+             base.eventable_bus_name = base.name.demodulize.underscore.to_sym
              base.allowed_entry_types = Set.new(['charge'])
              base.direction = :credit
              base.entry_method_data_defaults_config = nil
@@ -45,6 +46,7 @@ module PaymentCore
                define_metadata_class
                define_availability_rules_class
                define_entry_relations
+               register_cycle_events
              end
 
              base.include InstanceMethods
@@ -132,6 +134,21 @@ module PaymentCore
               custom_attributes_definition :availability_rules, klass, accessor: false
             end
 
+            def register_cycle_events
+              after_create do
+                publish_callback_event(:created)
+              end
+              after_update do
+                publish_callback_event(:updated)
+              end
+              after_save do
+                publish_callback_event(:saved)
+              end
+              after_destroy do
+                publish_callback_event(:destroyed)
+              end
+            end
+
           end
 
           module Hooks
@@ -180,6 +197,12 @@ module PaymentCore
 
               entry_callback(:after_save) do |entry|
                 entry.payment_method.update_column(:last_used_at, DateTime.now) if entry.payment_method
+              end
+
+              validate do
+                if holder.present? && !holder.payment_method_holder?
+                  errors.add(:holder, :invalid)
+                end
               end
 
               after_payment_core_initialization do
@@ -358,6 +381,11 @@ module PaymentCore
 
             def requires_payable?
               self.class.requires_payable?
+            end
+
+            def publish_callback_event(ename)
+              publish_event(ename, prefix: "", bus: self.class.base_class.eventable_bus_name)
+              publish_event(ename)
             end
 
           end

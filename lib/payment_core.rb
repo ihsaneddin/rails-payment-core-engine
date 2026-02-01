@@ -18,6 +18,7 @@ module PaymentCore
   autoload :Errors, "payment_core/errors"
   autoload :Decorators, 'payment_core/decorators'
   autoload :AttributeTypes, "payment_core/attribute_types"
+  autoload :Subscribers, "payment_core/subscribers"
 
   mattr_accessor :configuration
   @@configuration = Configuration
@@ -36,4 +37,5 @@ module PaymentCore
 
 end
 
+require "payment_core/subscribers"
 require "payment_core/railtie"

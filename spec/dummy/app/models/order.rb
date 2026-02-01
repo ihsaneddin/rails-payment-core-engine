@@ -28,11 +28,12 @@ class Order < OrderCore::Order
         end
       end
     end
-  end
-
-  payable_entries_callback :after_save do |entry|
-    if entry.charge? && entry.after_state_succeeded?
-      complete!
+    events do
+      entry do
+        saved do |entry|
+          complete! if entry.charge? && entry.after_state_succeeded?
+        end
+      end
     end
   end
 

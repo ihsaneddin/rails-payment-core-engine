@@ -63,7 +63,15 @@ module PaymentCore
                       name.demodulize.underscore
                     }
             }),
-            entry_requirements: ::PaymentCore::Models::Decorators::Payable.plugins_collection_config.build(**{ rules: {} })
+            entry_requirements: ::PaymentCore::Models::Decorators::Payable.plugins_collection_config.build(**{ rules: {} }),
+            events: plugins_config.build(**{
+              entry: plugins_config.build(**{
+                created: nil,
+                updated: nil,
+                saved: nil,
+                destroyed: nil
+              })
+            })
           }
         end
 

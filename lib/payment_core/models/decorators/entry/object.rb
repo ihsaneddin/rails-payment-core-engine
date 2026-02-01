@@ -247,22 +247,25 @@ module PaymentCore
             end
 
             def register_state_events
-              after_commit do
+              after_save do
                 if state.present? && state != state_before_last_save
-                  publish_event("state.#{state}")
+                  publish_callback_event("state.#{state}")
                 end
               end
             end
 
             def register_cycle_events
-              after_commit on: :create do
-                publish_event(:created)
+              after_create do
+                publish_callback_event(:created)
               end
-              after_commit on: :update do
-                publish_event(:updated)
+              after_update do
+                publish_callback_event(:updated)
               end
-              after_commit on: :destroy do
-                publish_event(:deleted)
+              after_save do
+                publish_callback_event(:saved)
+              end
+              after_destroy do
+                publish_callback_event(:destroyed)
               end
             end
 
@@ -532,6 +535,11 @@ module PaymentCore
 
             def method_missing(name, *args, &block)
               self.class.method_missing(name, *args, &block)
+            end
+
+            def publish_callback_event(ename)
+              publish_event(ename, prefix: "", bus: self.class.base_class.eventable_bus_name)
+              publish_event(ename)
             end
 
           end
