@@ -49,7 +49,7 @@ module PaymentCore
     class << self
 
       def load_sidekiq_scheduler(cfg)
-        if ::PaymentCore.config.sidekiq.scheduler_enabled
+        if ::PaymentCore.config.sidekiq.enable_scheduler
           sidekiq_scheduler_version = SidekiqScheduler::VERSION.to_i
           schedule_file = PaymentCore::Engine.root.join('config', 'payment_core_schedule.yml')
           return unless File.exist?(schedule_file)
@@ -65,6 +65,7 @@ module PaymentCore
           case sidekiq_scheduler_version
           when 4
             if payment_core_schedule
+              schedule = (Sidekiq.schedule || {}).dup
               schedule = schedule.merge(payment_core_schedule)
               cfg.schedule= schedule
               queues = cfg[:queues] || []
