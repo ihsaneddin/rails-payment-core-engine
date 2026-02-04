@@ -182,7 +182,7 @@ module PaymentCore
             end
 
             def schedule_for_expiration
-              if expires_at && pending
+              if expires_at && pending?
                 if expires_at.past?
                   PaymentCore::PaymentIntentWorker.perform_at(Time.current + 5.seconds, id, 'expiry')
                 else
