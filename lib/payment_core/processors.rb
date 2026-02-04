@@ -48,7 +48,22 @@ module PaymentCore
 
         def remove_action_access method_name, *accesses, prefix: nil
           action_access_method_names(method_name, prefix).each do |mname|
-            annotate_method(mname, remove_action_accesses: accesses.map(&:to_sym))
+            annotations = annotations_for(mname)
+            allowed = Array(annotations[:action_accesses]).compact.map(&:to_sym)
+            next if allowed.empty?
+
+            removals = accesses.map(&:to_sym)
+            if removals.include?(:all) || removals.include?(:*)
+              allowed = []
+            else
+              allowed -= removals
+            end
+
+            if allowed.empty?
+              clear_annotation_keys_for(mname, :action_accesses)
+            else
+              annotate_method(mname, action_accesses: allowed)
+            end
           end
         end
 
@@ -168,28 +183,19 @@ module PaymentCore
           access_list = Array(accesses).compact.map(&:to_sym)
           annotations = self.class.annotations_for(action_name.to_sym) || {}
           allowed = annotations[:action_accesses]
-          removed = annotations[:remove_action_accesses]
 
           if allowed.blank? && action_name.to_s.start_with?("collective_")
             base_name = action_name.to_s.delete_prefix("collective_").to_sym
             annotations = self.class.annotations_for(base_name) || {}
             allowed = annotations[:action_accesses]
-            removed = annotations[:remove_action_accesses]
           end
 
           if allowed.blank? && action_name.to_s.start_with?("webhook_")
             base_name = action_name.to_s.delete_prefix("webhook_").to_sym
             annotations = self.class.annotations_for(base_name) || {}
             allowed = annotations[:action_accesses]
-            removed = annotations[:remove_action_accesses]
           end
           allowed = Array(allowed).compact.map(&:to_sym)
-          removed = Array(removed).compact.map(&:to_sym)
-          if removed.include?(:all) || removed.include?(:*)
-            allowed = []
-          elsif removed.any?
-            allowed -= removed
-          end
           unless allowed.any? && (allowed & access_list).any?
             raise ::PaymentCore::Errors::ProcessorActionNotAllowed, "Processor action not allowed"
           end
