@@ -39,8 +39,7 @@ module PaymentCore
       }
 
       entry_callback :after_create do |entry|
-        delay = ::PaymentCore.config.payment_method.webhook_sla_seconds.to_i
-        ::PaymentCore::EntryWorker.perform_at(Time.current + delay, entry.id, "check_status")
+        schedule_check_status(entry)
       end
 
       after_initialize do
@@ -88,6 +87,20 @@ module PaymentCore
           merchant_id: metadata_merchant_id,
           secret_key: metadata_secret_key
         )
+      end
+
+      private
+
+      def schedule_check_status(entry)
+        delay = ::PaymentCore.config.payment_method.webhook_sla_seconds.to_i
+        now = Time.current
+        run_at = now + delay
+        intent = entry.payment_intent
+        if intent&.expires_at
+          expires_at = intent.expires_at
+          run_at = expires_at <= now ? now : [run_at, expires_at - 1.second].min
+        end
+        ::PaymentCore::EntryWorker.perform_at([run_at, now].max, entry.id, "check_status")
       end
 
     end
