@@ -8,7 +8,7 @@ module PaymentCore
       now = Time.at(metadata["scheduled_at"]).to_datetime rescue DateTime.now
       tomorrow = now.next.end_of_day
       model
-      .pending?
+      .with_state(:pending)
       .expires_on_date(tomorrow)
       .each do |intent|
         intent.schedule_for_expiration

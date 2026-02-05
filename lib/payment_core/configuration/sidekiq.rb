@@ -2,6 +2,8 @@ module PaymentCore
   module Configuration
     module Sidekiq
 
+      extend ::Plugins::Decorators::ConfigBuilder
+
       mattr_accessor :options
       @@options = { queue: "payment_core", retry: 3 }
 
@@ -14,11 +16,25 @@ module PaymentCore
       mattr_accessor :append_queue
       @@append_queue = true
 
+      mattr_accessor :callbacks
+      @@callbacks = plugins_config.build(**{
+        before: nil,
+        after: nil,
+        ensure: nil,
+      })
       class << self
 
         def setup &block
           if block_given?
             block.arity.zero? ? instance_eval(&block) : yield(self)
+          end
+        end
+
+        def callbacks &block
+          if block_given?
+            @@callbacks.setup(&block)
+          else
+            @@callbacks
           end
         end
 

@@ -39,7 +39,7 @@ module PaymentCore
       }
 
       entry_callback :after_create do |entry|
-        schedule_check_status(entry)
+        schedule_check_status(entry) if entry.charge?
       end
 
       after_initialize do
