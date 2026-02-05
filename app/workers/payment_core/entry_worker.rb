@@ -8,12 +8,12 @@ module PaymentCore
       resource do |entry|
         return unless entry
         payment_method = entry.payment_method
-        return unless payment_method&.method_type.to_s == "fiuu"
-
         context = entry.context || ::PaymentCore.config.payment_method.availability_context_class_constant.new(**{})
         processor = payment_method.processor(payer: entry.payer, context: context)
         processor.perform(:check_status, { entry_id: entry.id }, context)
       end
+    rescue ::PaymentCore::Errors::UnknownProcessorActionError => e
+      Sidekiq.logger.error "Fail : #{e.message}"
     end
 
   end
