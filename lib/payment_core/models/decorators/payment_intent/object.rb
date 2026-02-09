@@ -150,6 +150,10 @@ module PaymentCore
                   validate :should_be_expired?
                 end
 
+                after_transition any => :expired do |intent|
+                  intent.expire_pending_entries!
+                end
+
               end
 
             end
@@ -172,6 +176,19 @@ module PaymentCore
               scope :expires_on_date, ->(date) { where.not(expires_at: nil).where("DATE(expires_at) = ?", date) }
 
               entry_callback :validate do |entry|
+                if entry.payment_intent&.expired?
+                  method_data = entry.metadata&.payment_method_data
+                  method_type = method_data.respond_to?(:method_type) ? method_data.method_type : nil
+                  if entry.respond_to?(:state_will_be_succeeded?) && entry.state_will_be_succeeded?
+                    entry.publish_event(
+                      "late_success",
+                      object: entry,
+                      payment_intent_id: entry.payment_intent_id,
+                      method_type: method_type
+                    )
+                  end
+                  entry.errors.add(:payment_intent, :expired)
+                end
                 if metadata.strict_entry_class
                   unless metadata.allowed_entry_classes.include?(entry.class.name)
                     entry.errors.add(:type, :entry_type_not_allowed)
@@ -280,6 +297,18 @@ module PaymentCore
             def not_expired!
               expiry if should_be_expired?
               !expired?
+            end
+
+            def expire_pending_entries!(reason: "payment_intent_expired")
+              return unless respond_to?(:entries)
+
+              scope = entries.with_state(:pending).or(entries.with_state(:processing))
+              scope.find_each do |entry|
+                entry.failure_reason ||= reason
+                entry.expired_at ||= Time.current
+                entry.state = "expired"
+                entry.save(validate: false)
+              end
             end
 
             protected

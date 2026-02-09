@@ -6,11 +6,19 @@ module PaymentCore
 
     def schedule(metadata={})
       now = Time.at(metadata["scheduled_at"]).to_datetime rescue DateTime.now
+      model
+        .with_state(:pending)
+        .where.not(expires_at: nil)
+        .where("expires_at < ?", now)
+        .find_each do |intent|
+          intent.expiry
+        end
+
       tomorrow = now.next.end_of_day
       model
       .with_state(:pending)
       .expires_on_date(tomorrow)
-      .each do |intent|
+      .find_each do |intent|
         intent.schedule_for_expiration
       end
     end
