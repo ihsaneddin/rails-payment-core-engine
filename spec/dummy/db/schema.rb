@@ -78,6 +78,7 @@ ActiveRecord::Schema[7.0].define(version: 2026_01_27_000000) do
     t.bigint "currency_id"
     t.string "currency_name"
     t.string "hash_number"
+    t.string "txid"
     t.string "state"
     t.string "description"
     t.date "date"

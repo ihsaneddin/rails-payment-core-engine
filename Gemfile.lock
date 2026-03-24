@@ -43,15 +43,17 @@ PATH
     ewallet (0.2.0)
       aasm
       activeentity (>= 6.1.0)
-      alba
       array_enum
+      grape
+      grape-entity
+      grape-kaminari
       options_model
-      pagy (>= 3.6.0)
       paranoia
-      rails (>= 7.0.2)
-      ransack (>= 3.1.0)
+      plugins
+      rails (>= 7.0.3.1)
       sidekiq
       sidekiq-scheduler
+      state_machines-activerecord
       validates_timeliness (~> 7.0.0.beta1)
       with_advisory_lock
 
@@ -193,6 +195,11 @@ GEM
     erubi (1.13.1)
     et-orbi (1.2.11)
       tzinfo
+    factory_bot (6.5.6)
+      activesupport (>= 6.1.0)
+    factory_bot_rails (6.5.1)
+      factory_bot (~> 6.5)
+      railties (>= 6.1.0)
     fugit (1.11.1)
       et-orbi (~> 1, >= 1.2.11)
       raabro (~> 1.4)
@@ -401,6 +408,7 @@ DEPENDENCIES
   byebug
   dotenv-rails
   ewallet!
+  factory_bot_rails
   order_core!
   pagy (~> 6.5.0)
   payment_core!

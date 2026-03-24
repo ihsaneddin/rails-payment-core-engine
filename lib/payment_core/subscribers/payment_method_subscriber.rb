@@ -4,6 +4,8 @@ module PaymentCore
 
       include ::Plugins::Models::Concerns::Eventable::SubscribesToEvents
 
+      event_object_is_a "PaymentCore::PaymentMethod"
+
       on_event :created, handler: :created, bus: :payment_method
       on_event :updated, handler: :updated, bus: :payment_method
       on_event :saved, handler: :saved, bus: :payment_method

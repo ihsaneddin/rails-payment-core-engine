@@ -7,6 +7,7 @@ unless defined?(Rails) && Rails.application&.initialized?
 end
 abort("The Rails environment is running in production mode!") if Rails.env.production?
 require "rspec/rails"
+require "factory_bot_rails"
 
 Dir[PaymentCore::Engine.root.join("spec/support/**/*.rb")].sort.each { |f| require f }
 Dir[PaymentCore::Engine.root.join("spec/dummy/lib/**/*.rb")].sort.each { |f| require f }
@@ -19,8 +20,12 @@ rescue ActiveRecord::NoDatabaseError => e
   warn "Database not available: #{e.message}"
 end
 
+FactoryBot.definition_file_paths = [PaymentCore::Engine.root.join("spec/factories").to_s]
+FactoryBot.find_definitions
+
 RSpec.configure do |config|
   config.fixture_path = File.expand_path("fixtures", __dir__)
+  config.include FactoryBot::Syntax::Methods
 
   config.use_transactional_fixtures = false
   if defined?(DatabaseCleaner)

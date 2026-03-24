@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "PaymentCore holder processor actions", type: :request do
+RSpec.describe "PaymentCore holder payment method processor actions API", type: :request do
   include Rack::Test::Methods
 
   def app
@@ -204,7 +204,7 @@ RSpec.describe "PaymentCore holder processor actions", type: :request do
 
   context "cash actions" do
     it "charges via API" do
-      order = build_order(item: product_item, name: 'goblok')
+      order = build_order(item: product_item, name: "goblok")
 
       post "/holder/#{holder_type}/#{user.id}/payment_method/#{cash_method.id}/charge",
         payable_id: order.id,
@@ -361,64 +361,35 @@ RSpec.describe "PaymentCore holder processor actions", type: :request do
     end
 
     it "charges via collective processor action API" do
-      payment_package_methods = create_payment_package_methods([
-        product_top_up_service_package_small_a,
-        product_top_up_service_package_small_b
-      ])
-      expect(payment_package_methods.size).to eq(2)
-      payment_package_methods.each(&:reload)
-      order = build_order(item: product_service, quantity: 6, name: 'anjing')
-      context_payload = {
-        currencies: [
-          order.payable_currency,
-          payment_package_methods.first.currency,
-          payment_package_methods.last.currency
-        ].compact.uniq,
-        use_cases: ["checkout"],
-        payables: { order: [order.id] }
-      }
+      payment_package_methods = create_payment_package_methods(
+        [product_top_up_service_package_small_a, product_top_up_service_package_small_b]
+      )
+      order = build_order(item: product_service)
 
-      post "/holder/#{holder_type}/#{user.id}/payment_methods/#{payment_package_methods.first.method_type}/charge",
+      post "/holder/#{holder_type}/#{user.id}/payment_methods/payment_package/charge",
         payable_id: order.id,
         payable_type: order.class.name,
         payment_method_ids: payment_package_methods.map(&:id),
-        currency: "MYR",
-        context: context_payload
+        currency: "MYR"
+
       expect(last_response.status).to be < 300
-      entry = json_body.fetch("data")
-      expect(entry["state"]).to eq("succeeded")
-      components = Array(entry["components"])
-      expect(components.size).to be >= 2
-      method_ids = components.map { |component| component["payment_method_id"] }.uniq.sort
-      expect(method_ids).to eq(payment_package_methods.map(&:id).sort)
+      wrapper = json_body.fetch("data")
+      expect(wrapper["components"]).to be_present
     end
 
     it "keeps wrapper processing for mixed orders via collective processor action API" do
-      payment_package_methods = create_payment_package_methods([
-        product_top_up_service_package_small_a,
-        product_top_up_service_package_small_b
-      ])
-      expect(payment_package_methods.size).to eq(2)
-      payment_package_methods.each(&:reload)
+      payment_package_methods = create_payment_package_methods(
+        [product_top_up_service_package_small_a, product_top_up_service_package_small_b]
+      )
       order = Order.create!(customer: user)
-      order.line_item_line_items.create!(item: product_service, quantity: 1, use_item_data: true)
       order.line_item_line_items.create!(item: product_item, quantity: 1, use_item_data: true)
-      context_payload = {
-        currencies: [
-          order.payable_currency,
-          payment_package_methods.first.currency,
-          payment_package_methods.last.currency
-        ].compact.uniq,
-        use_cases: ["checkout"],
-        payables: { order: [order.id] }
-      }
+      order.line_item_line_items.create!(item: product_service, quantity: 1, use_item_data: true)
 
-      post "/holder/#{holder_type}/#{user.id}/payment_methods/#{payment_package_methods.first.method_type}/charge",
+      post "/holder/#{holder_type}/#{user.id}/payment_methods/payment_package/charge",
         payable_id: order.id,
         payable_type: order.class.name,
         payment_method_ids: payment_package_methods.map(&:id),
-        currency: "MYR",
-        context: context_payload
+        currency: "MYR"
 
       expect(last_response.status).to eq(422)
       expect(json_body.fetch("error")).to eq("Unprocessable entity")

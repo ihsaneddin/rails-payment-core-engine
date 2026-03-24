@@ -10,6 +10,7 @@ group :development, :test do
   gem 'pg'
   gem 'byebug'
   gem 'rspec-rails'
+  gem 'factory_bot_rails'
   gem 'webmock'
   gem 'dotenv-rails'
 end

@@ -46,6 +46,7 @@ class CreateEwalletTables < ActiveRecord::Migration[6.0]
       t.references :currency, index: true
       t.string :currency_name
       t.string :hash_number
+      t.string :txid
       t.string :state
       t.string :description
       t.date :date

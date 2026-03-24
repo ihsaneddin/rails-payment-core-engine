@@ -15,9 +15,10 @@ module PaymentCore
       resource_context("payment_core")
 
       def self.draw(opts = {}, &block)
-        opts = { holder: true, webhooks: true }.merge(opts || {})
+        opts = { admin: true, holder: true, webhooks: true }.merge(opts || {})
         klass = duplicate(self)
         klass.class_exec(&block) if block_given?
+        klass.mount(::PaymentCore::Grape::Admin::Base.draw) if opts.fetch(:admin, true)
         klass.mount(::PaymentCore::Grape::Holder::Base.draw) if opts.fetch(:holder, true)
         klass.mount(::PaymentCore::Grape::Webhooks.draw) if opts.fetch(:webhooks, true)
         klass

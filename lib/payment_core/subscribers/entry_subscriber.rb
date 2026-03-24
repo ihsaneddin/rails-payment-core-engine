@@ -4,6 +4,8 @@ module PaymentCore
 
       include ::Plugins::Models::Concerns::Eventable::SubscribesToEvents
 
+      event_object_is_a "PaymentCore::Entry"
+
       on_event :created, handler: :created, bus: :entry
       on_event :updated, handler: :updated, bus: :entry
       on_event :saved, handler: :saved, bus: :entry
