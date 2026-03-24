@@ -12,7 +12,7 @@ RSpec.describe "PaymentCore admin entries API", type: :request do
   end
 
   def member_processor_path_for(record, action)
-    "/admin/#{record.method_type.to_s.singularize}/#{record.id}/#{action}"
+    "/admin/payment_method/#{record.id}/#{action}"
   end
 
   let(:admin_user) { create(:user, email: "admin@example.com", name: "Admin") }

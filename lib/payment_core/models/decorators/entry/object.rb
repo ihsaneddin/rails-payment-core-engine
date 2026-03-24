@@ -283,6 +283,7 @@ module PaymentCore
               end
               before_save do
                 # self.payment_method_amount ||= self.amount
+                self.payer ||= payable&.payable_payer if charge?
                 self.payer ||= payment_method&.holder if charge?
               end
             end

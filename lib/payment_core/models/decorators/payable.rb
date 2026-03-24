@@ -20,6 +20,7 @@ module PaymentCore
             quantity: 1,
             total_item_amount: 0,
             total_amount: 0,
+            payer: nil,
             paid_amount: proc {
               components = Array(payable_components).flatten
               payable_entries.with_entry_types("charge").succeeded.or(

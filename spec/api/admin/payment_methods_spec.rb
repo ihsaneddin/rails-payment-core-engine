@@ -71,7 +71,7 @@ RSpec.describe "PaymentCore admin payment methods API", type: :request do
   end
 
   def member_processor_path_for(record, action)
-    "#{member_path_for(record)}/#{action}"
+    "/admin/payment_method/#{record.id}/#{action}"
   end
 
   let(:admin_user) { create(:user, email: "admin@example.com", name: "Admin") }

@@ -5,7 +5,6 @@ module PaymentCore
         class << self
           def registered_payment_method_resources
             ::PaymentCore::Models::Decorators::PaymentMethod::Object.registered_classes
-              .reject { |klass| klass == ::PaymentCore::PaymentMethod }
               .select { |klass| klass.method_type.present? }
               .uniq { |klass| klass.method_type.to_s }
           end
@@ -34,36 +33,21 @@ module PaymentCore
               payment_method_resources.each do |payment_method_class|
                 payment_method_type = payment_method_class.method_type.to_s
                 mount(
-                  ::PaymentCore::Grape::Resources::PaymentMethods.draw(payment_method_type.pluralize) do
+                  ::PaymentCore::Grape::Resources::PaymentMethods.draw(
+                    payment_method_type.pluralize,
+                    processor_collective_actions: payment_method_class.base_class == payment_method_class,
+                    processor_actions: payment_method_class.base_class == payment_method_class
+                  ) do
                     self.payment_method_type = payment_method_type
                     self.skip_processor_action_access_validation = true
 
-                    query_scope do |query_scope, _api|
-                      query =
-                        case query_scope
-                        when ActiveRecord::Relation
-                          query_scope
-                        when ::PaymentCore::PaymentMethod
-                          payment_method_class.where(id: query_scope.id)
-                        else
-                          payment_method_class.where.not(id: nil)
-                        end
-
-                      query.where(method_type: payment_method_type)
+                    query_scope do |query|
+                      query.where.not(id: nil)
                     end
 
                     helpers do
                       def current_holder
-                        return @current_holder if defined?(@current_holder)
-
-                        @current_holder =
-                          if processor_collective_action?
-                            scope = records
-                            scope = scope.where(id: params[:payment_method_ids]) if params[:payment_method_ids].present?
-                            scope.first&.holder
-                          else
-                            record&.holder
-                          end
+                        nil
                       end
                     end
                   end
