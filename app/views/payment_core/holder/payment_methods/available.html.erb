@@ -1,0 +1,28 @@
+<h1>Available Payment Methods</h1>
+
+<p>
+  <%= link_to "Back", holder_payment_methods_path(holder_type: holder_type, holder_id: holder_id) %>
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Type</th>
+      <th>Display Name</th>
+      <th>Default</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @payment_methods.each do |payment_method| %>
+      <tr>
+        <td><%= payment_method.id %></td>
+        <td><%= payment_method.method_type %></td>
+        <td><%= payment_method.display_name %></td>
+        <td><%= payment_method.default? %></td>
+        <td><%= link_to "Show", holder_payment_method_path(holder_type: holder_type, holder_id: holder_id, id: payment_method.id) %></td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>

@@ -1,0 +1,36 @@
+<section>
+  <p>Dummy Admin</p>
+  <h1>Payment Method Detail</h1>
+  <p><%= link_to "Back to Payment Methods", admin_payment_methods_path %></p>
+  <p><%= link_to "Edit Payment Method", edit_admin_payment_method_path(@payment_method) %></p>
+</section>
+
+<dl>
+  <dt>Type</dt>
+  <dd><%= @payment_method.type %></dd>
+
+  <dt>Display Name</dt>
+  <dd><%= @payment_method.display_name %></dd>
+
+  <dt>Holder</dt>
+  <dd><%= [@payment_method.holder_type, @payment_method.holder_id].compact.join("#") %></dd>
+
+  <dt>Always Available</dt>
+  <dd><%= @payment_method.always_available? %></dd>
+</dl>
+
+<h2>Metadata</h2>
+<dl>
+  <% @payment_method.metadata.attributes.each do |key, value| %>
+    <dt><%= key.to_s.humanize %></dt>
+    <dd><%= value.is_a?(Array) || value.is_a?(Hash) ? value.to_json : value %></dd>
+  <% end %>
+</dl>
+
+<h2>Availability Rules</h2>
+<dl>
+  <% @payment_method.availability_rules.attributes.each do |key, value| %>
+    <dt><%= key.to_s.humanize %></dt>
+    <dd><%= value.is_a?(Array) || value.is_a?(Hash) ? value.to_json : value %></dd>
+  <% end %>
+</dl>

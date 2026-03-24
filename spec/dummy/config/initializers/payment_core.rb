@@ -6,6 +6,10 @@ PaymentCore.setup do |config|
 #     end
 #   end
 
+   config.api.authenticate_admin! do
+     User.first
+   end
+
    config.grape_api.setup do |api|
     api.authenticate! do
       User.first
