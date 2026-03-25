@@ -9,6 +9,8 @@ module PaymentCore
 
     initializer "payment_core.loader", before: :set_autoload_paths do |app|
       paths = []
+      paths << { dir: ::PaymentCore::Engine.root.join('app/controllers/payment_core').to_s, namespace: ::PaymentCore }
+      paths << { dir: ::PaymentCore::Engine.root.join('lib/payment_core/controllers').to_s, namespace: ::PaymentCore::Controllers }
       paths << { dir: ::PaymentCore::Engine.root.join('lib/payment_core/models').to_s, namespace: ::PaymentCore::Models}
       lpath = Rails.root.join("lib/payment_core")
       if lpath.exist?
@@ -27,6 +29,7 @@ module PaymentCore
     end
 
     config.to_prepare do
+      Rails.autoloaders.main.eager_load_namespace(::PaymentCore::Controllers)
       Rails.autoloaders.main.eager_load_namespace(::PaymentCore::Models)
       Rails.autoloaders.main.eager_load_namespace(::PaymentCore::Gateways)
       Rails.autoloaders.main.eager_load_namespace(::PaymentCore)
