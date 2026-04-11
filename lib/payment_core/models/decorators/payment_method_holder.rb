@@ -19,6 +19,9 @@ module PaymentCore
             email: nil,
             phone_number: nil,
             address: nil,
+            type: proc {
+              self.name.demodulize.underscore
+            },
             default_payment_method: proc {
               payment_methods.active.find_by(default: true)
             },
@@ -32,12 +35,13 @@ module PaymentCore
               end
             },
             api: ::PaymentCore.config.plugins_config.build(**{
+              enabled: true,
               finder: proc { |holder_id|
                 find(holder_id)
               },
-              type: proc {
-                      name.demodulize.underscore
-                    }
+              path: proc {
+                name.demodulize.underscore.pluralize
+              }
             }),
             events: plugins_config.build(**{
               payment_method: plugins_config.build(**{
@@ -65,6 +69,9 @@ module PaymentCore
             extend RelationHooks::ClassMethods
             extend PaymentMethodCallbacks
 
+            inheritable_class_attribute :payment_method_holder_type
+            self.payment_method_holder_type = name.demodulize.underscore
+
             payment_method_holder_setup do
               define_payment_method_holder_payment_method_relations
               define_payment_method_holder_entry_relations
@@ -89,10 +96,18 @@ module PaymentCore
             include ::Plugins.decorators.method_annotations
             include ::Plugins.decorators.inheritables
             include ::Plugins.decorators.hooks
+            include ::Plugins::Models::Concerns::ApiResource
           end
         end
 
         module Hooks
+
+          extend ActiveSupport::Concern
+          included do
+            grape_api_resource "payment_core" do
+              presenter "PaymentCore::Grape::Presenters::PaymentMethodHolder"
+            end
+          end
           module ClassMethods
 
             def inherited(subclass)

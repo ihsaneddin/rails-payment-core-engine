@@ -18,11 +18,11 @@ RSpec.describe "PaymentCore admin payment methods API", type: :request do
   end
 
   def collection_path_for(klass)
-    "/admin/#{klass.method_type.to_s.pluralize}"
+    "/admin/#{klass.payment_method_name.to_s.pluralize}"
   end
 
   def member_path_for(record)
-    "/admin/#{record.method_type.to_s.singularize}/#{record.id}"
+    "/admin/payment_method/#{record.id}"
   end
 
   def create_payload_for(klass)

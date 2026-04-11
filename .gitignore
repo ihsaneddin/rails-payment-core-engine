@@ -16,3 +16,5 @@ spec/.rspec_status
 /spec/dummy/.byebug_history
 .env
 /spec/dummy/.env
+/docs/**/*
+/.codex

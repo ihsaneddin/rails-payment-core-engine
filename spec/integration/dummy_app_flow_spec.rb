@@ -11,11 +11,16 @@ RSpec.describe "PaymentCore dummy app flows" do
     ensure_default_payment_methods
   end
 
-  let(:customer) { User.create!(email: "user@mail.com", name: "user") }
-  let(:product_item) { Product::Item.create!(price: 10, name: "Product Item #1", sku: "1") }
-  let(:product_service) { Product::Service.create!(price: 15, name: "Product Service #1", sku: "2") }
+  let(:customer) { create(:user, email: "user@mail.com", name: "user") }
+  let!(:cash_method) do
+    create(:cash_payment_method, display_name: "Cash", holder: nil)
+  end
+  let(:product_item) { create(:product_item, price: 10, name: "Product Item #1", sku: "1") }
+  let(:product_service) { create(:product_service, price: 15, name: "Product Service #1", sku: "2") }
   let(:product_top_up_wallet) do
-    Product::PaymentPackage.create!(
+    create(
+      :product_payment_package,
+      :wallet_top_up,
       price: 45,
       name: "Ewallet Top Up",
       sku: "3",
@@ -27,7 +32,8 @@ RSpec.describe "PaymentCore dummy app flows" do
     )
   end
   let(:product_top_up_service_package) do
-    Product::PaymentPackage.create!(
+    create(
+      :product_payment_package,
       price: 20,
       name: "Service Package Top Up",
       sku: "4",
@@ -37,25 +43,19 @@ RSpec.describe "PaymentCore dummy app flows" do
       will_be_expired: false,
       currency: "Service Package",
       custom_value: true,
-      product_values_attributes: [
+      product_values: [
         { product_id: product_service.id, value: 10 }
       ]
     )
   end
 
   def build_context(payable)
-    PaymentCore.config.payment_method.availability_context_class_constant.new(
-      regions: ["ID"],
-      currencies: ["MYR"],
-      use_cases: ["checkout"],
-      payables: [payable]
-    )
+    build(:payment_method_availability_context, payables: [payable])
   end
 
   def charge_with_cash(order)
     context = build_context(order)
-    cash = customer.available_payment_methods(context: context).find(&:cash?)
-    cash.processor(payer: customer, context: context).charge(
+    cash_method.processor(payer: customer, context: context).charge(
       amount: order.total_amount,
       payable: order,
       currency: "MYR",
@@ -66,23 +66,22 @@ RSpec.describe "PaymentCore dummy app flows" do
   end
 
   def top_up_accounts
-    order = Order.create!(customer: customer, name: "anjing")
-    order.line_item_line_items.create!(item: product_item, quantity: 1, use_item_data: true)
-    order.line_item_line_items.create!(item: product_top_up_wallet, quantity: 1, use_item_data: true)
-    order.line_item_line_items.create!(item: product_top_up_service_package, quantity: 1, use_item_data: true)
+    order = create(:order, customer: customer, name: "anjing", state: "waiting_payment")
+    create(:line_item, order: order, item: product_item, quantity: 1)
+    create(:line_item, order: order, item: product_top_up_wallet, quantity: 1)
+    create(:line_item, order: order, item: product_top_up_service_package, quantity: 1)
 
     charge_with_cash(order)
 
-    wallet_account = customer.current_ewallet
-      .get_accounts_of(product_top_up_wallet.get_or_create_ewallet_currency).first
-    service_account = customer.current_ewallet
-      .get_accounts_of(product_top_up_service_package.get_or_create_ewallet_currency).first
+    wallet_account = customer.current_ewallet_account(product_top_up_wallet.get_or_create_ewallet_currency)
+    service_account = customer.current_ewallet_account(product_top_up_service_package.get_or_create_ewallet_currency)
 
     [order, wallet_account, service_account]
   end
 
   def service_package_method
-    customer.available_payment_methods.find { |pm| pm.payment_package? && pm.package.custom_value }
+    customer.payment_methods.reset if customer.respond_to?(:payment_methods)
+    customer.available_payment_methods.find { |pm| pm.payment_package? && pm.package&.custom_value }
   end
 
   def ensure_default_payment_methods
@@ -103,9 +102,9 @@ RSpec.describe "PaymentCore dummy app flows" do
   it "rejects payment package when order has non-eligible items" do
     top_up_accounts
 
-    order = Order.create!(customer: customer, name: "bedul")
-    order.line_item_line_items.create!(item: product_item, quantity: 1, use_item_data: true)
-    order.line_item_line_items.create!(item: product_service, quantity: 1, use_item_data: true)
+    order = create(:order, customer: customer, name: "bedul")
+    create(:line_item, order: order, item: product_item, quantity: 1)
+    create(:line_item, order: order, item: product_service, quantity: 1)
 
     context = build_context(order)
     package_method = customer.available_payment_methods(context: context)
@@ -128,8 +127,8 @@ RSpec.describe "PaymentCore dummy app flows" do
     _order, _wallet_account, service_account = top_up_accounts
     package_method = service_package_method
 
-    order = Order.create!(customer: customer, name: "service-order")
-    line_item = order.line_item_line_items.create!(item: product_service, quantity: 1, use_item_data: true)
+    order = create(:order, customer: customer, name: "service-order", item: product_service)
+    line_item = order.line_item_line_items.first
     previous_balance = service_account.reload.balance
 
     entry = package_method.processor.charge(
@@ -152,8 +151,7 @@ RSpec.describe "PaymentCore dummy app flows" do
     _order, _wallet_account, _service_account = top_up_accounts
     package_method = service_package_method
 
-    order = Order.create!(customer: customer, name: "service-order-large")
-    order.line_item_line_items.create!(item: product_service, quantity: 20, use_item_data: true)
+    order = create(:order, customer: customer, name: "service-order-large", item: product_service, quantity: 20)
 
     entry = package_method.processor.charge(
       amount: order.total_amount,
@@ -169,14 +167,15 @@ RSpec.describe "PaymentCore dummy app flows" do
   end
 
   it "builds fiuu redirect payload and url" do
-    order = Order.create!(customer: customer, name: "fiuu-order", state: "cart")
-    order.line_item_line_items.create!(item: product_item, quantity: 1, use_item_data: true)
+    order = create(:order, customer: customer, name: "fiuu-order", state: "cart", item: product_item)
     order.update!(state: "waiting_payment")
 
-    payment_method = PaymentCore::PaymentMethods::Fiuu.create!(
+    payment_method = create(
+      :fiuu_payment_method,
       display_name: "Fiuu",
       active: true,
       always_available: true,
+      holder: nil,
       metadata_merchant_id: "merchant-1",
       metadata_secret_key: "secret-1",
       metadata_verify_key: "verify-1"
@@ -196,26 +195,33 @@ RSpec.describe "PaymentCore dummy app flows" do
   end
 
   it "creates api scenario orders" do
-    order = Order.create!(customer: customer)
-    order.line_item_line_items.create!(item: product_item, quantity: 1, use_item_data: true)
+    order = create(:order, customer: customer, item: product_item)
     expect(order).to be_persisted
 
-    order = Order.create!(customer: customer)
-    order.line_item_line_items.create!(item: product_item, quantity: 1, use_item_data: true)
-    order.line_item_line_items.create!(item: product_service, quantity: 1, use_item_data: true)
+    order = create(
+      :order,
+      customer: customer,
+      line_items: [
+        { item: product_item, quantity: 1 },
+        { item: product_service, quantity: 1 }
+      ]
+    )
     expect(order).to be_persisted
 
-    order = Order.create!(customer: customer)
-    order.line_item_line_items.create!(item: product_service, quantity: 1, use_item_data: true)
+    order = create(:order, customer: customer, item: product_service)
     expect(order).to be_persisted
 
-    order = Order.create!(customer: customer)
-    order.line_item_line_items.create!(item: product_service, quantity: 20, use_item_data: true)
+    order = create(:order, customer: customer, item: product_service, quantity: 20)
     expect(order).to be_persisted
 
-    order = Order.create!(customer: customer)
-    order.line_item_line_items.create!(item: product_service, quantity: 1, use_item_data: true)
-    order.line_item_line_items.create!(item: product_item, quantity: 1, use_item_data: true)
+    order = create(
+      :order,
+      customer: customer,
+      line_items: [
+        { item: product_service, quantity: 1 },
+        { item: product_item, quantity: 1 }
+      ]
+    )
     expect(order).to be_persisted
   end
 end

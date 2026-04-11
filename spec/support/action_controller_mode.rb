@@ -15,6 +15,7 @@ module ActionControllerMode
     PaymentCore::Engine.routes.clear!
     load PaymentCore::Engine.root.join("config/routes.rb")
     PaymentCore::Engine.routes_reloader&.execute_if_updated if PaymentCore::Engine.respond_to?(:routes_reloader)
+    Rails.application.reload_routes!
   end
 end
 

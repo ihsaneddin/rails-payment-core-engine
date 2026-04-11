@@ -30,30 +30,29 @@ module PaymentCore
       def edit; end
 
       def create
-        @payment_method = resource
-        if @payment_method.save
-          redirect_to admin_payment_method_path(@payment_method), notice: "Payment method created."
+        if resource.save
+          redirect_to admin_payment_method_path(resource), notice: "Payment method created."
         else
-          flash.now[:alert] = @payment_method.errors.full_messages.to_sentence
+          flash.now[:alert] = resource.errors.full_messages.to_sentence
           render :new, status: :unprocessable_entity
         end
       end
 
       def update
-        attrs = normalized_payment_method_attributes(permitted_attributes, record.class)
-        if record.update(attrs)
-          redirect_to admin_payment_method_path(record), notice: "Payment method updated."
+        attrs = normalized_payment_method_attributes(permitted_attributes, resource.class)
+        if resource.update(attrs)
+          redirect_to admin_payment_method_path(resource), notice: "Payment method updated."
         else
-          flash.now[:alert] = record.errors.full_messages.to_sentence
+          flash.now[:alert] = resource.errors.full_messages.to_sentence
           render :edit, status: :unprocessable_entity
         end
       end
 
       def destroy
-        if record.destroy
+        if resource.destroy
           redirect_to admin_payment_methods_path, notice: "Payment method deleted."
         else
-          redirect_to admin_payment_methods_path, alert: record.errors.full_messages.to_sentence
+          redirect_to admin_payment_methods_path, alert: resource.errors.full_messages.to_sentence
         end
       end
 

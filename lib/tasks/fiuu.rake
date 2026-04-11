@@ -41,16 +41,7 @@ namespace :payment_core do
       order.update!(state: "waiting_payment")
       order.reload
 
-      payment_method = PaymentCore::PaymentMethods::Fiuu.find_or_create_by!(display_name: "Fiuu Sandbox") do |pm|
-        pm.active = true
-        pm.always_available = true
-        pm.metadata_merchant_id = merchant_id
-        pm.metadata_secret_key = secret_key
-        pm.metadata_verify_key = verify_key
-        pm.metadata_return_url = return_url if return_url.present?
-        pm.metadata_callback_url = callback_url if callback_url.present?
-        pm.metadata_notify_url = notify_url if notify_url.present?
-      end
+      payment_method = PaymentCore::PaymentMethods::Fiuu.find_or_create_by!(display_name: "Fiuu Sandbox") { |pm| pm.active = true; pm.always_available = true; pm.metadata_merchant_id = merchant_id; pm.metadata_secret_key = secret_key; pm.metadata_verify_key = verify_key; pm.metadata_return_url = return_url if return_url.present?; pm.metadata_callback_url = callback_url if callback_url.present?; pm.metadata_notify_url = notify_url if notify_url.present? }
 
       context = PaymentCore.config.payment_method.availability_context_class_constant.new(
         regions: ["ID"],

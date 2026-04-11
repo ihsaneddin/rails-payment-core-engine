@@ -7,17 +7,19 @@ RSpec.describe "PaymentCore subscribers" do
   end
 
   it "completes order when entry succeeds via payable events" do
-    user = User.create!(email: "user@example.com", name: "User")
-    product_item = Product::Item.create!(price: 100, name: "Test Item", sku: "item-1")
+    user = create(:user, email: "user@example.com", name: "User")
+    product_item = create(:product_item, price: 100, name: "Test Item", sku: "item-1")
 
-    order = Order.create!(customer: user, name: "order-1")
-    order.line_item_line_items.create!(item: product_item, quantity: 1, use_item_data: true)
+    order = create(:order, customer: user, name: "order-1")
+    create(:line_item, order: order, item: product_item, quantity: 1)
     order.reload
 
-    payment_method = PaymentCore::PaymentMethods::Cash.create!(
+    payment_method = create(
+      :cash_payment_method,
       display_name: "Cash",
       active: true,
-      always_available: true
+      always_available: true,
+      holder: nil
     )
 
     context = PaymentCore.config.payment_method.availability_context_class_constant.new(
@@ -36,9 +38,10 @@ RSpec.describe "PaymentCore subscribers" do
   end
 
   it "runs payment method holder events on payment method update" do
-    user = User.create!(email: "user@example.com", name: "User")
+    user = create(:user, email: "user@example.com", name: "User")
 
-    payment_method = PaymentCore::PaymentMethods::Cash.create!(
+    payment_method = create(
+      :cash_payment_method,
       display_name: "Cash",
       active: true,
       always_available: true,

@@ -13,7 +13,7 @@ RSpec.describe "PaymentCore holder entries API", type: :request do
   end
 
   let(:user) { create(:user, email: "user@example.com", name: "User") }
-  let(:holder_type) { user.class.payment_method_holder_api.type }
+  let(:holder_type) { user.class.payment_method_holder_config.type }
   let(:product_item) { create(:product_item, price: 10, name: "Product Item", sku: "item-1") }
   let(:cash_method) do
     create(:cash_payment_method, display_name: "Cash", holder: user)

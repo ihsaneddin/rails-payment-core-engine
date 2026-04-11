@@ -19,7 +19,7 @@ RSpec.describe "PaymentCore holder payment methods ActionController", type: :req
   end
 
   let(:user) { create(:user, email: "user@example.com", name: "User") }
-  let(:holder_type) { user.class.payment_method_holder_api.type }
+  let(:holder_type) { user.class.payment_method_holder_config.type }
   let(:cash_method) { create(:cash_payment_method, display_name: "Cash", holder: user) }
   let(:bank_transfer_method) { create(:bank_transfer_payment_method, display_name: "Bank Transfer", holder: user) }
   let(:fiuu_method) { create(:fiuu_payment_method, display_name: "Fiuu", holder: user) }

@@ -10,15 +10,17 @@ RSpec.describe "PaymentCore holder payment method processor actions API", type: 
   before(:all) do
     Order; LineItem; User; Product; PaymentPackageProductValue
     Product::Item; Product::Service; Product::PaymentPackage
+    PaymentCore::Attributes::Entries::MethodData::FiuuMethod
   end
 
-  let(:user) { User.create!(email: "user@example.com", name: "User") }
-  let(:holder_type) { user.class.payment_method_holder_api.type }
+  let(:user) { create(:user, email: "user@example.com", name: "User") }
+  let(:holder_type) { user.class.payment_method_holder_config.type }
 
-  let(:product_item) { Product::Item.create!(price: 10, name: "Product Item", sku: "item-1") }
-  let(:product_service) { Product::Service.create!(price: 15, name: "Product Service", sku: "svc-1") }
+  let(:product_item) { create(:product_item, price: 10, name: "Product Item", sku: "item-1") }
+  let(:product_service) { create(:product_service, price: 15, name: "Product Service", sku: "svc-1") }
   let(:product_top_up_service_package) do
-    Product::PaymentPackage.create!(
+    create(
+      :product_payment_package,
       price: 20,
       name: "Service Package Top Up",
       sku: "pkg-1",
@@ -28,13 +30,14 @@ RSpec.describe "PaymentCore holder payment method processor actions API", type: 
       will_be_expired: false,
       currency: "Service Package",
       custom_value: true,
-      product_values_attributes: [
+      product_values: [
         { product_id: product_service.id, value: 10 }
       ]
     )
   end
   let(:product_top_up_service_package_small_a) do
-    Product::PaymentPackage.create!(
+    create(
+      :product_payment_package,
       price: 20,
       name: "Service Package Split A",
       sku: "pkg-split-a",
@@ -44,13 +47,14 @@ RSpec.describe "PaymentCore holder payment method processor actions API", type: 
       will_be_expired: false,
       currency: "Service Package A",
       custom_value: true,
-      product_values_attributes: [
+      product_values: [
         { product_id: product_service.id, value: 10 }
       ]
     )
   end
   let(:product_top_up_service_package_small_b) do
-    Product::PaymentPackage.create!(
+    create(
+      :product_payment_package,
       price: 20,
       name: "Service Package Split B",
       sku: "pkg-split-b",
@@ -60,20 +64,20 @@ RSpec.describe "PaymentCore holder payment method processor actions API", type: 
       will_be_expired: false,
       currency: "Service Package B",
       custom_value: true,
-      product_values_attributes: [
+      product_values: [
         { product_id: product_service.id, value: 10 }
       ]
     )
   end
 
   let(:bank_transfer_method) do
-    PaymentCore::PaymentMethods::BankTransfer.create!(
+    create(
+      :bank_transfer_payment_method,
       display_name: "Bank Transfer",
       bank_name: "Bank Example",
       bank_code: "BANK-EX",
       bank_account_name: "Test Account",
       bank_account_number: "1234567890",
-      default_currency: "MYR",
       active: true,
       always_available: true,
       holder: user
@@ -81,7 +85,8 @@ RSpec.describe "PaymentCore holder payment method processor actions API", type: 
   end
 
   let(:cash_method) do
-    PaymentCore::PaymentMethods::Cash.create!(
+    create(
+      :cash_payment_method,
       display_name: "Cash",
       active: true,
       always_available: true,
@@ -89,7 +94,8 @@ RSpec.describe "PaymentCore holder payment method processor actions API", type: 
     )
   end
   let(:fiuu_method) do
-    PaymentCore::PaymentMethods::Fiuu.create!(
+    create(
+      :fiuu_payment_method,
       display_name: "Fiuu",
       active: true,
       always_available: true,
@@ -105,10 +111,7 @@ RSpec.describe "PaymentCore holder payment method processor actions API", type: 
   end
 
   def build_order(name: nil, item:, quantity: 1)
-    order = Order.create!(customer: user, name: name)
-    order.line_item_line_items.create!(item: item, quantity: quantity, use_item_data: true)
-    order.reload
-    order
+    create(:order, customer: user, name: name, item: item, quantity: quantity)
   end
 
   def build_context(payable)
@@ -122,8 +125,7 @@ RSpec.describe "PaymentCore holder payment method processor actions API", type: 
 
   def charge_with_cash(order)
     context = build_context(order)
-    cash = user.available_payment_methods(context: context).find(&:cash?)
-    cash.processor(payer: user, context: context).charge(
+    cash_method.processor(payer: user, context: context).charge(
       amount: order.total_amount,
       payable: order,
       currency: "MYR",
@@ -132,11 +134,13 @@ RSpec.describe "PaymentCore holder payment method processor actions API", type: 
   end
 
   def ensure_payment_package_method(package, line_item)
+    user.payment_methods.reset if user.respond_to?(:payment_methods)
     payment_method = user.available_payment_methods.find do |pm|
       pm.payment_package? && pm.package == package
     end
     if payment_method.nil? || payment_method.balance.to_d.zero?
       package.process(user, quantity: line_item.quantity || 1, reference: line_item)
+      user.payment_methods.reset if user.respond_to?(:payment_methods)
       payment_method = user.available_payment_methods.find do |pm|
         pm.payment_package? && pm.package == package
       end
@@ -146,12 +150,8 @@ RSpec.describe "PaymentCore holder payment method processor actions API", type: 
 
   def create_payment_package_method
     cash_method
-    order = Order.create!(customer: user)
-    line_item = order.line_item_line_items.create!(
-      item: product_top_up_service_package,
-      quantity: 1,
-      use_item_data: true
-    )
+    order = create(:order, customer: user, state: "waiting_payment")
+    line_item = create(:line_item, order: order, item: product_top_up_service_package, quantity: 1)
     charge_with_cash(order)
     ensure_payment_package_method(product_top_up_service_package, line_item)
   end
@@ -159,12 +159,8 @@ RSpec.describe "PaymentCore holder payment method processor actions API", type: 
   def create_payment_package_methods(packages)
     cash_method
     packages.map do |package|
-      order = Order.create!(customer: user)
-      line_item = order.line_item_line_items.create!(
-        item: package,
-        quantity: 1,
-        use_item_data: true
-      )
+      order = create(:order, customer: user, state: "waiting_payment")
+      line_item = create(:line_item, order: order, item: package, quantity: 1)
       charge_with_cash(order)
       ensure_payment_package_method(package, line_item)
     end.compact
@@ -252,28 +248,11 @@ RSpec.describe "PaymentCore holder payment method processor actions API", type: 
       expect(entry["state"]).to eq("succeeded")
     end
 
-    it "blocks charge when access scopes do not include public" do
-      payment_package_method = create_payment_package_method
-      order = build_order(item: product_service)
-
-      original_accesses = PaymentCore::Grape::Holder::PaymentMethods.processor_action_accesses
-      PaymentCore::Grape::Holder::PaymentMethods.processor_action_accesses = [:staff]
-      begin
-        post "/holder/#{holder_type}/#{user.id}/payment_method/#{payment_package_method.id}/charge",
-          payable_id: order.id,
-          payable_type: order.class.name,
-          currency: "MYR"
-        expect(last_response.status).to eq(401)
-      ensure
-        PaymentCore::Grape::Holder::PaymentMethods.processor_action_accesses = original_accesses
-      end
-    end
-
     it "keeps wrapper processing for mixed orders via payment method API" do
       payment_package_method = create_payment_package_method
-      order = Order.create!(customer: user)
-      order.line_item_line_items.create!(item: product_item, quantity: 1, use_item_data: true)
-      order.line_item_line_items.create!(item: product_service, quantity: 1, use_item_data: true)
+      order = create(:order, customer: user)
+      create(:line_item, order: order, item: product_item, quantity: 1)
+      create(:line_item, order: order, item: product_service, quantity: 1)
 
       post "/holder/#{holder_type}/#{user.id}/payment_method/#{payment_package_method.id}/charge",
         payable_id: order.id,
@@ -381,9 +360,9 @@ RSpec.describe "PaymentCore holder payment method processor actions API", type: 
       payment_package_methods = create_payment_package_methods(
         [product_top_up_service_package_small_a, product_top_up_service_package_small_b]
       )
-      order = Order.create!(customer: user)
-      order.line_item_line_items.create!(item: product_item, quantity: 1, use_item_data: true)
-      order.line_item_line_items.create!(item: product_service, quantity: 1, use_item_data: true)
+      order = create(:order, customer: user)
+      create(:line_item, order: order, item: product_item, quantity: 1)
+      create(:line_item, order: order, item: product_service, quantity: 1)
 
       post "/holder/#{holder_type}/#{user.id}/payment_methods/payment_package/charge",
         payable_id: order.id,

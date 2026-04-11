@@ -15,9 +15,13 @@ module PaymentCore
 
         module HelperMethods
 
+          def payment_method_class_finder
+          ::PaymentCore::Models::Decorators::PaymentMethod::Object.registered_classes.find{|klass| klass.payment_method_name.to_s.singularize == class_context.payment_method_name.to_s.singularize}
+          end
+
           def payment_method_class
             unless @payment_method_class
-              @payment_method_class = instance_exec(class_context.payment_method_type, &class_context.payment_method_class_finder)
+              @payment_method_class = payment_method_class_finder
               raise ::ActiveRecord::RecordNotFound unless @payment_method_class
             end
             @payment_method_class
@@ -56,8 +60,8 @@ module PaymentCore
 
           def processor_action_accesses
             klass = class_context
-            if klass && klass <= ::PaymentCore::Grape::Holder::PaymentMethods
-              ::PaymentCore::Grape::Holder::PaymentMethods.processor_action_accesses || []
+            if klass && klass <= ::PaymentCore::Grape::Resources::PaymentMethods
+              klass.processor_action_accesses || []
             else
               klass.try(:processor_action_accesses) || []
             end

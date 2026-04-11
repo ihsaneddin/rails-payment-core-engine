@@ -35,8 +35,9 @@ module PaymentCore
              base.include Hooks
              base.extend Hooks::ClassMethods
 
-             base.inheritable_class_attribute :method_type, :allowed_entry_types, :direction, :requires_payable, :entry_method_data_defaults_config
+             base.inheritable_class_attribute :method_type, :allowed_entry_types, :direction, :requires_payable, :entry_method_data_defaults_config, :payment_method_name
              base.method_type = base.name.demodulize.underscore
+             base.payment_method_name = base.name.demodulize.underscore
              base.eventable_bus_name = base.name.demodulize.underscore.to_sym
              base.allowed_entry_types = Set.new(['charge'])
              base.direction = :credit
@@ -214,17 +215,33 @@ module PaymentCore
                 end
               end
               grape_api_resource "payment_core", default: true do
-                query_scope do |query_scope, api|
-                  #api.current_holder.payment_method_candidates
-                  if api.route.options[:action_name] == "update"
-                    api.current_holder.payment_methods
-                  else
-                    api.current_holder.payment_method_candidates
-                  end
+                use_api_evaluation true
+                query_scope do |query|
+                  query.where.not(id: nil)
                 end
                 resource_params_attributes do
+                  metadata_keys = payment_method_class.store_model_klass_of(:metadata).assignable_attributes.map do |key|
+                    :"metadata_#{key}"
+                  end
+                  availability_rule_keys = payment_method_class.store_model_klass_of(:availability_rules).assignable_attributes.map(&:to_sym)
+
                   [
-                    :label_name, :active
+                    :type,
+                    :display_name,
+                    :label_name,
+                    :active,
+                    :always_available,
+                    :default,
+                    :holder_type,
+                    :holder_id,
+                    :reference_type,
+                    :reference_id,
+                    :use_reference,
+                    :currency,
+                    :expires_at,
+                    :external_provider
+                  ] + metadata_keys + [
+                    { availability_rules: availability_rule_keys }
                   ]
                 end
                 presenter "PaymentCore::Grape::Presenters::PaymentMethod"
@@ -235,9 +252,8 @@ module PaymentCore
               def inherited(subclass)
                 super(subclass)
                 subclass.method_type= subclass.name.demodulize.underscore
-                after_class_defined(subclass) do
-                  ::PaymentCore::Models::Decorators::PaymentMethod::Object << subclass
-                end
+                subclass.payment_method_name = subclass.name.demodulize.underscore
+                ::PaymentCore::Models::Decorators::PaymentMethod::Object << subclass
               end
 
             end

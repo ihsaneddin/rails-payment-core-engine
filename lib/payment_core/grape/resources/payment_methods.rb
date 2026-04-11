@@ -2,12 +2,13 @@ module PaymentCore
   module Grape
     module Resources
       class PaymentMethods < ::PaymentCore::Grape::Resources::Base
-        inheritable_class_attribute :processor_action_accesses, :given_context, :payment_method_type, :payment_method_class_finder, :skip_processor_action_access_validation
 
-        self.payment_method_type = "payment_method"
-        self.payment_method_class_finder = proc {|payment_method_type|
-          ::PaymentCore::Models::Decorators::PaymentMethod::Object.registered_classes.find{|klass| klass.method_type.to_s == payment_method_type.to_s.singularize}
-        }
+        include ::PaymentCore::Grape::Helpers::PaymentMethods
+
+        inheritable_class_attribute :processor_action_accesses, :given_context, :payment_method_name, :skip_processor_action_access_validation
+
+        self.payment_method_name = "payment_method"
+
         self.processor_action_accesses = [:public]
         self.skip_processor_action_access_validation = false
         self.given_context = lambda do
@@ -24,32 +25,22 @@ module PaymentCore
           model_klass do
             payment_method_class
           end
+        end
 
-          resource_params_attributes do
-            payment_method_model = model_class_constant
-            metadata_keys = payment_method_model.store_model_klass_of(:metadata).assignable_attributes.map do |key|
-              :"metadata_#{key}"
+        helpers do
+          def perform_processor_action
+            if class_context.skip_processor_action_access_validation
+              processor.perform(
+                processor_action_name,
+                *processor_action_arguments
+              )
+            else
+              processor.perform_with_access(
+                action_name: processor_action_name,
+                accesses: processor_action_accesses,
+                action_arguments: processor_action_arguments
+              )
             end
-            availability_rule_keys = payment_method_model.store_model_klass_of(:availability_rules).assignable_attributes.map(&:to_sym)
-
-            [
-              :type,
-              :display_name,
-              :label_name,
-              :active,
-              :always_available,
-              :default,
-              :holder_type,
-              :holder_id,
-              :reference_type,
-              :reference_id,
-              :use_reference,
-              :currency,
-              :expires_at,
-              :external_provider
-            ] + metadata_keys + [
-              { availability_rules: availability_rule_keys }
-            ]
           end
         end
 
@@ -57,9 +48,10 @@ module PaymentCore
 
           def draw(*args, &block)
             opts = args.extract_options!
-            payment_method_type = args[0]
-            return unless payment_method_type
+            resource_name = args[0]
+            return unless resource_name
             klass = duplicate(self, &block)
+            klass.payment_method_name = resource_name
             opts = {
               index: true,
               create: true,
@@ -71,8 +63,9 @@ module PaymentCore
               resource_actions: true,
               processor_actions: true
             }.merge(opts)
-            subject = payment_method_type.to_s.to_sym
-            resources_path = payment_method_type
+            subject = resource_name.to_s.singularize.to_sym
+
+            resources_path = resource_name.to_s.pluralize
             klass.resources "#{resources_path}" do
               if opts[:index]
                 desc "Get list of holder payment methods"
@@ -122,7 +115,7 @@ module PaymentCore
               end
 
             end
-            resource_path = payment_method_type.to_s.singularize
+            resource_path = payment_method_name.to_s.singularize
             klass.resource "#{resource_path}/:id" do
               if opts[:show]
                 desc "Show existing payment method "
@@ -169,24 +162,17 @@ module PaymentCore
             klass
           end
 
-        end
+          def draws(*args, &block)
+            opts = args.extract_options!
+            payment_method_names = args
 
-        helpers do
-          def perform_processor_action
-            if class_context.skip_processor_action_access_validation
-              processor.perform(
-                processor_action_name,
-                *processor_action_arguments
-              )
-            else
-              processor.perform_with_access(
-                action_name: processor_action_name,
-                accesses: processor_action_accesses,
-                action_arguments: processor_action_arguments
-              )
+            payment_method_names.map do |payment_method_name|
+              draw(payment_method_name, opts, &block)
             end
           end
+
         end
+
       end
     end
   end

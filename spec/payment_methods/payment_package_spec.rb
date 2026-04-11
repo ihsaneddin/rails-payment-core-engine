@@ -10,11 +10,15 @@ RSpec.describe PaymentCore::PaymentMethods::PaymentPackage do
     ensure_default_payment_methods
   end
 
-  let(:customer) { User.create!(email: "user@mail.com", name: "user") }
-  let(:product_item) { Product::Item.create!(price: 10, name: "Product Item #1", sku: "1") }
-  let(:product_service) { Product::Service.create!(price: 15, name: "Product Service #1", sku: "2") }
+  let(:customer) { create(:user, email: "user@mail.com", name: "user") }
+  let!(:cash_method) do
+    create(:cash_payment_method, display_name: "Cash", holder: nil)
+  end
+  let(:product_item) { create(:product_item, price: 10, name: "Product Item #1", sku: "1") }
+  let(:product_service) { create(:product_service, price: 15, name: "Product Service #1", sku: "2") }
   let(:product_top_up_service_package) do
-    Product::PaymentPackage.create!(
+    create(
+      :product_payment_package,
       price: 20,
       name: "Service Package Top Up",
       sku: "4",
@@ -24,7 +28,7 @@ RSpec.describe PaymentCore::PaymentMethods::PaymentPackage do
       will_be_expired: false,
       currency: "Service Package",
       custom_value: true,
-      product_values_attributes: [
+      product_values: [
         { product_id: product_service.id, value: 10 }
       ]
     )
@@ -48,8 +52,7 @@ RSpec.describe PaymentCore::PaymentMethods::PaymentPackage do
 
   def charge_with_cash(order)
     context = build_context(order)
-    cash = customer.available_payment_methods(context: context).find(&:cash?)
-    cash.processor(payer: customer, context: context).charge(
+    cash_method.processor(payer: customer, context: context).charge(
       amount: order.total_amount,
       payable: order,
       currency: "MYR",
@@ -58,12 +61,7 @@ RSpec.describe PaymentCore::PaymentMethods::PaymentPackage do
   end
 
   def create_payment_package_method
-    order = Order.create!(customer: customer)
-    order.line_item_line_items.create!(
-      item: product_top_up_service_package,
-      quantity: 1,
-      use_item_data: true
-    )
+    order = create(:order, customer: customer, item: product_top_up_service_package)
     charge_with_cash(order)
 
     customer.available_payment_methods.find { |pm| pm.payment_package? && pm.package.custom_value }

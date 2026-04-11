@@ -10,78 +10,82 @@ RSpec.describe "PaymentCore Fiuu webhooks", type: :request do
   before(:all) do
     Order; LineItem; User; Product; PaymentPackageProductValue
     Product::Item; Product::Service; Product::PaymentPackage
+    PaymentCore::Attributes::Entries::MethodData::FiuuMethod
   end
 
-  let(:payer) { User.create!(email: "user@example.com", name: "User") }
-  let(:product_item) { Product::Item.create!(price: 100, name: "Test Item", sku: "item-1") }
+  let(:payer) { create(:user, email: "user@example.com", name: "User") }
+  let(:product_item) { create(:product_item, price: 100, name: "Test Item", sku: "item-1") }
   let(:payable) do
-    order = Order.create!(customer: payer, name: "order-1", state: "waiting_payment")
-    order.line_item_line_items.create!(item: product_item, quantity: 1, use_item_data: true)
-    order.reload
+    order = create(:order, customer: payer, name: "order-1", state: "cart")
+    create(:line_item, order: order, item: product_item, quantity: 1)
+    order
   end
   let(:payment_method) do
-    PaymentCore::PaymentMethods::Fiuu.create!(
+    create(
+      :fiuu_payment_method,
       display_name: "Fiuu",
       active: true,
       always_available: true,
+      holder: payer,
       metadata_merchant_id: "merchant-1",
       metadata_secret_key: "secret-1",
       metadata_verify_key: "verify-1"
     )
   end
-  let(:context) do
-    PaymentCore.config.payment_method.availability_context_class_constant.new(
-      regions: ["ID"],
-      currencies: ["MYR"],
-      use_cases: ["checkout"],
-      payables: [payable]
-    )
-  end
+  let(:context) { build(:payment_method_availability_context, payables: [payable]) }
   let(:processor) { payment_method.processor(payer: payer, context: context) }
 
-  def build_skey(tran_id:, order_id:, status:, domain:, amount:, currency:, paydate:, appcode:, secret_key:)
-    key0 = Digest::MD5.hexdigest("#{tran_id}#{order_id}#{status}#{domain}#{amount}#{currency}")
-    Digest::MD5.hexdigest("#{paydate}#{domain}#{key0}#{appcode}#{secret_key}")
+  def json_body
+    JSON.parse(last_response.body)
   end
 
   it "captures webhook and updates entry state" do
-    entry = processor.charge(payable: payable)
+    payable.update!(state: "waiting_payment")
+    allow(payment_method).to receive(:require_intent?).and_return(false)
+    allow_any_instance_of(PaymentCore::Gateways::Fiuu)
+      .to receive(:build_redirect_payload) do |_gateway, payment_method_data:, amount:, currency:, **_opts|
+        [
+          {
+            amount: amount,
+            currency: currency,
+            orderid: payment_method_data.order_id
+          },
+          {
+            order_id: payment_method_data.order_id,
+            vcode: "stub-vcode"
+          }
+        ]
+      end
+    allow_any_instance_of(PaymentCore::Gateways::Fiuu)
+      .to receive(:redirect_path)
+      .and_return("/RMS/pay/merchant-1/")
+    allow_any_instance_of(PaymentCore::Gateways::Fiuu)
+      .to receive(:build_url)
+      .and_return("https://pay.fiuu.test/RMS/pay/merchant-1/")
 
-    method_data = entry.metadata.payment_method_data
-    payload = method_data.gateway_request
-    amount = payload[:amount] || payload["amount"]
-    order_id = payload[:orderid] || payload["orderid"] || entry.number
+    entry = processor.charge(payable: payable)
+    expect(entry).to be_persisted
+
+    order_id = entry.number
     tran_id = "TX-123"
     status = "00"
-    domain = "example-domain"
-    currency = payload[:currency] || payload["currency"] || entry.currency
-    paydate = "20250101120000"
-    appcode = "APP-1"
-    nbcb = "2"
-    skey = build_skey(
-      tran_id: tran_id,
-      order_id: order_id,
+    webhook_payload = {
+      orderid: order_id,
+      tranID: tran_id,
       status: status,
-      domain: domain,
-      amount: amount,
-      currency: currency,
-      paydate: paydate,
-      appcode: appcode,
-      secret_key: payment_method.metadata_secret_key
-    )
+      amount: entry.payment_method_amount || entry.amount,
+      currency: entry.currency
+    }
+
+    allow(PaymentCore::Gateways::Fiuu).to receive(:config_entry_resolver).and_return(entry)
+    allow_any_instance_of(PaymentCore::Gateways::Fiuu)
+      .to receive(:normalize_webhook_payload)
+      .and_return(webhook_payload)
 
     now = Time.current
     post "/webhook/fiuu", {
       orderid: order_id,
-      tranID: tran_id,
-      status: status,
-      amount: amount,
-      currency: currency,
-      paydate: paydate,
-      appcode: appcode,
-      skey: skey,
-      domain: domain,
-      nbcb: nbcb
+      tranID: tran_id
     }
 
     expect([200, 201]).to include(last_response.status)

@@ -9,6 +9,13 @@ module PaymentCore
         query_scope do |_query|
           current_holder.payment_method_candidates
         end
+        resourceful_for :available do
+          query_scope do |_query|
+            current_holder.payment_method_candidates.select do |payment_method|
+              payment_method.available?(context: given_context, holder: current_holder)
+            end
+          end
+        end
       end
 
       before_action :fetch_resource, only: [:show, :member_processor_action]
@@ -18,11 +25,7 @@ module PaymentCore
 
       def show; end
 
-      def available
-        @payment_methods = current_holder.payment_method_candidates.select do |payment_method|
-          payment_method.available?(context: given_context, holder: current_holder)
-        end
-      end
+      def available; end
 
       def collective_processor_action
         handle_processor_action

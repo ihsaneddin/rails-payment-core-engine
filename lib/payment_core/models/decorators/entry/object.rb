@@ -314,8 +314,9 @@ module PaymentCore
             included do
 
               grape_api_resource 'payment_core', default: true do
-                query_scope do |query_scope, api|
-                  api.current_holder.payment_entries
+                use_api_evaluation true
+                query_scope do |query|
+                  query.where.not(id: nil)
                 end
                 presenter "PaymentCore::Grape::Presenters::Entry"
               end
