@@ -210,6 +210,37 @@ RSpec.describe "PaymentCore holder payment method processor actions API", type: 
       entry = json_body.fetch("data")
       expect(entry["state"]).to eq("succeeded")
     end
+
+    it "charges via payable api type alias for order" do
+      order = build_order(item: product_item, name: "payable-order")
+
+      post "/holder/#{holder_type}/#{user.id}/payment_method/#{cash_method.id}/charge",
+        payable_id: order.id,
+        payable_type: "order",
+        currency: "MYR"
+
+      expect(last_response.status).to be < 300
+      entry = json_body.fetch("data")
+      expect(entry["state"]).to eq("succeeded")
+      expect(entry["payable_type"]).to eq(order.class.base_class.name)
+      expect(entry["payable_id"]).to eq(order.id)
+    end
+
+    it "charges via payable api type alias for line item" do
+      order = create(:order, customer: user, name: "payable-line-item")
+      line_item = create(:line_item, order: order, item: product_item, quantity: 1)
+
+      post "/holder/#{holder_type}/#{user.id}/payment_method/#{cash_method.id}/charge",
+        payable_id: line_item.id,
+        payable_type: "line_item",
+        currency: "MYR"
+
+      expect(last_response.status).to be < 300
+      entry = json_body.fetch("data")
+      expect(entry["state"]).to eq("succeeded")
+      expect(entry["payable_type"]).to eq(line_item.class.base_class.name)
+      expect(entry["payable_id"]).to eq(line_item.id)
+    end
   end
 
   context "fiuu actions" do

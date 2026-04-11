@@ -211,7 +211,7 @@ module PaymentCore
         def payable_class(payable_type)
           payable_type.safe_constantize ||
             ::PaymentCore::Models::Decorators::Payable.registered_classes.find do |klass|
-              klass.payable_api.type == payable_type
+              klass.payable_config.tipe == payable_type
             end ||
             raise(ActiveRecord::RecordNotFound)
         end
@@ -241,7 +241,7 @@ module PaymentCore
 
         def payable_type_options_for_select
           registered_payable_classes.map do |klass|
-            [klass.payable_api.type.to_s.humanize, klass.payable_api.type.to_s]
+            [klass.payable_config.tipe.to_s.humanize, klass.payable_config.tipe.to_s]
           end
         end
 
@@ -255,7 +255,7 @@ module PaymentCore
             next if records.blank?
 
             [
-              klass.payable_api.type.to_s.humanize,
+              klass.payable_config.tipe.to_s.humanize,
               records.map do |payable|
                 [payable_option_label(payable), payable.id]
               end
@@ -298,7 +298,7 @@ module PaymentCore
         def registered_payable_classes
           ::PaymentCore::Models::Decorators::Payable.registered_classes
             .select { |klass| klass.respond_to?(:payable_api) }
-            .uniq { |klass| klass.payable_api.type.to_s }
+            .uniq { |klass| klass.payable_config.tipe.to_s }
         end
 
         def normalized_processor_request_params

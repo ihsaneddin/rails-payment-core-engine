@@ -53,15 +53,19 @@ module PaymentCore
             from_payment_method_amount: proc { |payment_method, payment_method_amount|
               payable_total_amount * (payment_method_amount.to_d / payable_payment_method_total_amount(payment_method))
             },
+            tipe: proc {
+              name.demodulize.underscore
+            },
             api: ::PaymentCore.config.plugins_config.build(**{
               finder: proc { |payable_id|
                 find(payable_id)
               },
+              enabled: true,
               finders: proc { |ids|
                         where(id: ids)
                       },
-              type: proc {
-                      name.demodulize.underscore
+              path: proc {
+                      name.demodulize.underscore.pluralize
                     }
             }),
             entry_requirements: ::PaymentCore::Models::Decorators::Payable.plugins_collection_config.build(**{ rules: {} }),
@@ -123,10 +127,18 @@ module PaymentCore
             include ::Plugins.decorators.method_annotations
             include ::Plugins.decorators.inheritables
             include ::Plugins.decorators.hooks
+            include ::Plugins::Models::Concerns::ApiResource
           end
         end
 
         module Hooks
+
+          extend ActiveSupport::Concern
+          included do
+            grape_api_resource "payment_core" do
+              presenter "PaymentCore::Grape::Presenters::Payable"
+            end
+          end
           module ClassMethods
 
             def inherited(subclass)
