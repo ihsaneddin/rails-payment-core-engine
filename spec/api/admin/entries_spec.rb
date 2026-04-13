@@ -4,7 +4,7 @@ RSpec.describe "PaymentCore admin entries API", type: :request do
   include Rack::Test::Methods
 
   def app
-    PaymentCore::Grape::Base.draw
+    PaymentCore::Grape::Base.draw(draw_options)
   end
 
   def json_body
@@ -12,11 +12,12 @@ RSpec.describe "PaymentCore admin entries API", type: :request do
   end
 
   def member_processor_path_for(record, action)
-    "/admin/payment_method/#{record.id}/#{action}"
+    "#{admin_prefix}/payment_method/#{record.id}/#{action}"
   end
 
   let(:admin_user) { create(:user, email: "admin@example.com", name: "Admin") }
   let(:holder_user) { create(:user, email: "holder@example.com", name: "Holder") }
+  let(:draw_options) { {} }
   let(:cash_method) do
     create(:cash_payment_method, display_name: "Cash", holder: holder_user)
   end
@@ -51,7 +52,7 @@ RSpec.describe "PaymentCore admin entries API", type: :request do
 
   it "lists entries via admin endpoints" do
     entry
-    get "/admin/entries"
+    get "#{admin_prefix}/entries"
 
     expect(last_response.status).to eq(200)
     expect(json_body.fetch("data").map { |row| row["id"] }).to include(entry.id)
@@ -59,9 +60,29 @@ RSpec.describe "PaymentCore admin entries API", type: :request do
 
   it "shows entries via admin endpoints" do
     entry
-    get "/admin/entry/#{entry.id}"
+    get "#{admin_prefix}/entry/#{entry.id}"
 
     expect(last_response.status).to eq(200)
     expect(json_body.fetch("data").fetch("id")).to eq(entry.id)
+  end
+
+  context "when namespace is provided" do
+    let(:draw_options) { { namespace: :platform, admin: { namespace: :staff } } }
+
+    def admin_prefix
+      "/platform/staff"
+    end
+
+    it "does not keep the old admin entries path" do
+      entry
+
+      get "/admin/entries"
+
+      expect(last_response.status).to eq(404)
+    end
+  end
+
+  def admin_prefix
+    "/admin"
   end
 end

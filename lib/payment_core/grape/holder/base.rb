@@ -6,10 +6,11 @@ module PaymentCore
         include ::PaymentCore::Grape::Helpers::PaymentMethodHolders
 
         def self.draw(opts = {}, &block)
-          opts = { payment_methods: true, entries: true }.merge(opts || {})
+          opts = { payment_methods: true, entries: true, namespace: "holder/:holder_type/:holder_id" }.merge(opts || {})
           klass = duplicate(self)
           klass.class_exec(&block) if block_given?
-          klass.namespace "holder/:holder_type/:holder_id" do
+
+          mount_routes = proc do
             if opts.fetch(:payment_methods, true)
               mount(
                 ::PaymentCore::Grape::Resources::PaymentMethods.draw("payment_method", create: false, update: false, destroy: false) do
@@ -46,6 +47,15 @@ module PaymentCore
               end)
             end
           end
+
+          if opts[:namespace].present?
+            klass.namespace opts[:namespace] do
+              instance_exec(&mount_routes)
+            end
+          else
+            klass.instance_exec(&mount_routes)
+          end
+
           klass
         end
 

@@ -10,7 +10,7 @@ RSpec.describe "PaymentCore admin payment methods API", type: :request do
   ].filter_map(&:safe_constantize).freeze
 
   def app
-    PaymentCore::Grape::Base.draw
+    PaymentCore::Grape::Base.draw(draw_options)
   end
 
   def json_body
@@ -18,11 +18,11 @@ RSpec.describe "PaymentCore admin payment methods API", type: :request do
   end
 
   def collection_path_for(klass)
-    "/admin/#{klass.payment_method_name.to_s.pluralize}"
+    "#{admin_prefix}/#{klass.payment_method_name.to_s.pluralize}"
   end
 
   def member_path_for(record)
-    "/admin/payment_method/#{record.id}"
+    "#{admin_prefix}/payment_method/#{record.id}"
   end
 
   def create_payload_for(klass)
@@ -71,12 +71,13 @@ RSpec.describe "PaymentCore admin payment methods API", type: :request do
   end
 
   def member_processor_path_for(record, action)
-    "/admin/payment_method/#{record.id}/#{action}"
+    "#{admin_prefix}/payment_method/#{record.id}/#{action}"
   end
 
   let(:admin_user) { create(:user, email: "admin@example.com", name: "Admin") }
   let(:holder_user) { create(:user, email: "holder@example.com", name: "Holder") }
   let(:product_item) { create(:product_item, price: 10, name: "Product Item", sku: "item-1") }
+  let(:draw_options) { {} }
 
   before(:all) do
     Order; LineItem; User; Product; PaymentPackageProductValue
@@ -267,5 +268,34 @@ RSpec.describe "PaymentCore admin payment methods API", type: :request do
       expect(method_data.redirect_url).to be_present
       expect(order_id).to eq(entry.number)
     end
+  end
+
+  context "when namespace is provided" do
+    let(:draw_options) { { namespace: :platform, admin: { namespace: :staff } } }
+
+    def admin_prefix
+      "/platform/staff"
+    end
+
+    it "mounts admin payment method routes under the provided namespaces" do
+      record = existing_record_for(PaymentCore::PaymentMethods::Cash)
+
+      get member_path_for(record)
+
+      expect(last_response.status).to eq(200)
+      expect(json_body.fetch("data").fetch("id")).to eq(record.id)
+    end
+
+    it "does not keep the old admin payment method path" do
+      record = existing_record_for(PaymentCore::PaymentMethods::Cash)
+
+      get "/admin/payment_method/#{record.id}"
+
+      expect(last_response.status).to eq(404)
+    end
+  end
+
+  def admin_prefix
+    "/admin"
   end
 end

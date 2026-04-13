@@ -6,7 +6,8 @@ module PaymentCore
         def self.draw(opts = {}, &block)
           opts = {
             payment_methods: true,
-            entries: true
+            entries: true,
+            namespace: "admin"
           }.merge(opts || {})
 
           klass = duplicate(self)
@@ -20,7 +21,8 @@ module PaymentCore
             end
           end
           klass.class_exec(&block) if block_given?
-          klass.namespace "admin" do
+
+          mount_routes = proc do
             if opts.fetch(:payment_methods, true)
               ::PaymentCore::Models::Decorators::PaymentMethod::Object.registered_classes.each do |payment_method_class|
 
@@ -47,6 +49,15 @@ module PaymentCore
             end
             mount(::PaymentCore::Grape::Resources::Entries.draw("entries", create: false, update: false, destroy: false, resources_actions: false, resource_actions: false)) if opts.fetch(:entries, true)
           end
+
+          if opts[:namespace].present?
+            klass.namespace opts[:namespace] do
+              instance_exec(&mount_routes)
+            end
+          else
+            klass.instance_exec(&mount_routes)
+          end
+
           klass
         end
       end

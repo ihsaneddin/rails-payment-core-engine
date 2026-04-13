@@ -4,7 +4,7 @@ RSpec.describe "PaymentCore Fiuu webhooks", type: :request do
   include Rack::Test::Methods
 
   def app
-    PaymentCore::Grape::Base.draw
+    PaymentCore::Grape::Base.draw(draw_options)
   end
 
   before(:all) do
@@ -34,6 +34,7 @@ RSpec.describe "PaymentCore Fiuu webhooks", type: :request do
   end
   let(:context) { build(:payment_method_availability_context, payables: [payable]) }
   let(:processor) { payment_method.processor(payer: payer, context: context) }
+  let(:draw_options) { {} }
 
   def json_body
     JSON.parse(last_response.body)
@@ -83,7 +84,7 @@ RSpec.describe "PaymentCore Fiuu webhooks", type: :request do
       .and_return(webhook_payload)
 
     now = Time.current
-    post "/webhook/fiuu", {
+    post webhook_path, {
       orderid: order_id,
       tranID: tran_id
     }
@@ -97,5 +98,23 @@ RSpec.describe "PaymentCore Fiuu webhooks", type: :request do
     expect(entry.metadata.payment_method_data.last_webhook_attempt_at).to be_within(5.seconds).of(now)
     expect(payload[:orderid]).to eq(order_id)
     expect(payload[:tranID]).to eq(tran_id)
+  end
+
+  context "when namespace is provided" do
+    let(:draw_options) { { namespace: :platform } }
+
+    def webhook_path
+      "/platform/webhook/fiuu"
+    end
+
+    it "does not keep the old webhook path" do
+      post "/webhook/fiuu", orderid: "x", tranID: "y"
+
+      expect(last_response.status).to eq(404)
+    end
+  end
+
+  def webhook_path
+    "/webhook/fiuu"
   end
 end
