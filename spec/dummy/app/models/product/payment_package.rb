@@ -66,8 +66,11 @@ class Product::PaymentPackage < Product
   def get_or_create_ewallet_currency
     return @curr if @curr
 
-    @curr = Ewallet::Currency.where(reference: self, name: currency, issuer: Ewallet.config.default_issuer).first
-    @curr ||= Ewallet::Currency.create(reference: self, name: currency, issuer: Ewallet.config.default_issuer)
+    issuer = Ewallet.config.issuer.default
+    issuer = issuer.call if issuer.is_a?(Proc)
+
+    @curr = Ewallet::Currency.where(reference: self, name: currency, issuer: issuer).first
+    @curr ||= Ewallet::Currency.create(reference: self, name: currency, issuer: issuer)
     @curr
   end
 

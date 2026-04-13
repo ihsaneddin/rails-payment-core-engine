@@ -1,0 +1,74 @@
+<h1>Payment Method</h1>
+
+<p><%= link_to "Back", admin_payment_methods_path %></p>
+<p><%= link_to "Edit", edit_admin_payment_method_path(@payment_method) %></p>
+
+<dl>
+  <dt>ID</dt>
+  <dd><%= @payment_method.id %></dd>
+
+  <dt>Type</dt>
+  <dd><%= @payment_method.type %></dd>
+
+  <dt>Method Type</dt>
+  <dd><%= @payment_method.method_type %></dd>
+
+  <dt>Display Name</dt>
+  <dd><%= @payment_method.display_name %></dd>
+
+  <dt>Holder</dt>
+  <dd><%= [@payment_method.holder_type, @payment_method.holder_id].compact.join("#") %></dd>
+
+  <dt>Active</dt>
+  <dd><%= @payment_method.active? %></dd>
+
+  <dt>Always Available</dt>
+  <dd><%= @payment_method.always_available? %></dd>
+</dl>
+
+<h3>Metadata</h3>
+<dl>
+  <% @payment_method.metadata.attributes.each do |key, value| %>
+    <dt><%= key.to_s.humanize %></dt>
+    <dd><%= value.is_a?(Array) || value.is_a?(Hash) ? value.to_json : value %></dd>
+  <% end %>
+</dl>
+
+<h3>Availability Rules</h3>
+<dl>
+  <% @payment_method.availability_rules.attributes.each do |key, value| %>
+    <dt><%= key.to_s.humanize %></dt>
+    <dd><%= value.is_a?(Array) || value.is_a?(Hash) ? value.to_json : value %></dd>
+  <% end %>
+</dl>
+
+<% actions = member_processor_actions_for(@payment_method) %>
+<% if actions.present? %>
+  <h3>Processor Actions</h3>
+  <% actions.each do |processor_action| %>
+    <% processor = @payment_method.processor(context: given_context, payer: current_processor_payer) %>
+    <%= form_with url: admin_payment_method_processor_action_path(id: @payment_method.id, processor_action: processor_action), local: true do %>
+      <% processor_param_fields_for(processor, processor_action).each do |field| %>
+        <div>
+          <%= label_tag processor_field_input_name(field), field[:label] %>
+          <% case field[:input] %>
+          <% when :payable_type %>
+            <%= select_tag processor_field_input_name(field), options_for_select(payable_type_options_for_select) %>
+          <% when :payable_id %>
+            <%= select_tag processor_field_input_name(field), grouped_options_for_select(payable_grouped_options_for_select) %>
+          <% when :checkbox %>
+            <%= check_box_tag processor_field_input_name(field), "1", false %>
+          <% when :json %>
+            <%= text_area_tag "#{field[:name]}_json", "", rows: 4 %>
+          <% else %>
+            <%= text_field_tag processor_field_input_name(field) %>
+          <% end %>
+        </div>
+      <% end %>
+
+      <div>
+        <%= submit_tag processor_action.to_s.humanize %>
+      </div>
+    <% end %>
+  <% end %>
+<% end %>

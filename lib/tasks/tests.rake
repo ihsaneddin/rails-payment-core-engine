@@ -100,6 +100,7 @@ namespace :payment_core do
         }
       )
       puts "The order state should be 'completed'"
+      debugger
       if order.reload.state != "completed"
         raise "Test failed"
       end
@@ -146,7 +147,7 @@ namespace :payment_core do
       end
 
       puts "# Create customer order to purchase service package item"
-      order = Order.create(customer: customer)
+      order = Order.create(customer: customer, name: "anjing")
       line_item = order.line_item_line_items.create(item: product_service, quantity: 1, use_item_data: true)
 
       pms = customer.available_payment_methods()
@@ -155,6 +156,8 @@ namespace :payment_core do
 
       previous_balance = ewallet_account.balance
       order.reload
+      puts "# Total order amount #{order.reload.payable_total_amount.to_s}"
+      puts "# Total balance #{sp.balance.to_s}"
       puts "# Pay the order using customer ewallet service package"
       entry = sp.processor.charge(
         amount: order.total_amount,

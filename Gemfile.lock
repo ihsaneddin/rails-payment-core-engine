@@ -1,3 +1,12 @@
+GIT
+  remote: https://github.com/ihsaneddin/state_machines-activerecord.git
+  revision: 3394ede00165a350e56d4efa3e9d9f3ce874770a
+  branch: rails-7-0-fiber-fix
+  specs:
+    state_machines-activerecord (0.9.0)
+      activerecord (>= 6.0)
+      state_machines-activemodel (>= 0.9.0)
+
 PATH
   remote: ../order_core
   specs:
@@ -26,6 +35,7 @@ PATH
       rails (>= 7.0.1)
       ransack (~> 3.1.0)
       store_model
+      with_advisory_lock
 
 PATH
   remote: ../rails-ewallet-engine
@@ -33,15 +43,17 @@ PATH
     ewallet (0.2.0)
       aasm
       activeentity (>= 6.1.0)
-      alba
       array_enum
+      grape
+      grape-entity
+      grape-kaminari
       options_model
-      pagy (>= 3.6.0)
       paranoia
-      rails (>= 7.0.2)
-      ransack (>= 3.1.0)
+      plugins
+      rails (>= 7.0.3.1)
       sidekiq
       sidekiq-scheduler
+      state_machines-activerecord
       validates_timeliness (~> 7.0.0.beta1)
       with_advisory_lock
 
@@ -55,12 +67,14 @@ PATH
       grape-entity
       grape-kaminari
       hashdiff
+      httparty
       paranoia
       plugins
       rails (~> 7.0.2, >= 7.0.2.2)
       ransack (>= 3.1.0)
       sidekiq
       sidekiq-scheduler
+      state_machines-activerecord
       validates_timeliness
 
 GEM
@@ -136,6 +150,8 @@ GEM
       i18n (>= 1.6, < 2)
       minitest (>= 5.1)
       tzinfo (~> 2.0)
+    addressable (2.8.8)
+      public_suffix (>= 2.0.2, < 8.0)
     alba (3.7.3)
     array_enum (1.6.0)
       activemodel
@@ -148,8 +164,17 @@ GEM
       with_advisory_lock (>= 4.0.0)
     concurrent-ruby (1.3.5)
     connection_pool (2.5.3)
+    crack (1.0.1)
+      bigdecimal
+      rexml
     crass (1.0.6)
+    csv (3.3.5)
     date (3.4.1)
+    diff-lcs (1.6.2)
+    dotenv (3.2.0)
+    dotenv-rails (3.2.0)
+      dotenv (= 3.2.0)
+      railties (>= 6.1)
     dry-core (1.1.0)
       concurrent-ruby (~> 1.0)
       logger
@@ -170,6 +195,11 @@ GEM
     erubi (1.13.1)
     et-orbi (1.2.11)
       tzinfo
+    factory_bot (6.5.6)
+      activesupport (>= 6.1.0)
+    factory_bot_rails (6.5.1)
+      factory_bot (~> 6.5)
+      railties (>= 6.1.0)
     fugit (1.11.1)
       et-orbi (~> 1, >= 1.2.11)
       raabro (~> 1.4)
@@ -188,6 +218,10 @@ GEM
       grape (>= 1.6.1)
       kaminari-grape
     hashdiff (1.2.0)
+    httparty (0.24.2)
+      csv
+      mini_mime (>= 1.0.0)
+      multi_xml (>= 0.5.2)
     i18n (1.14.7)
       concurrent-ruby (~> 1.0)
     kaminari-core (1.2.2)
@@ -208,6 +242,8 @@ GEM
     mini_mime (1.1.5)
     minitest (5.25.5)
     multi_json (1.15.0)
+    multi_xml (0.8.1)
+      bigdecimal (>= 3.1, < 5)
     mustermann (3.0.3)
       ruby2_keywords (~> 0.0.1)
     mustermann-grape (1.1.0)
@@ -249,6 +285,7 @@ GEM
     psych (5.2.6)
       date
       stringio
+    public_suffix (7.0.2)
     puma (6.6.0)
       nio4r (~> 2.0)
     raabro (1.4.0)
@@ -291,6 +328,24 @@ GEM
       i18n
     redis-client (0.25.0)
       connection_pool
+    rexml (3.4.4)
+    rspec-core (3.13.6)
+      rspec-support (~> 3.13.0)
+    rspec-expectations (3.13.5)
+      diff-lcs (>= 1.2.0, < 2.0)
+      rspec-support (~> 3.13.0)
+    rspec-mocks (3.13.7)
+      diff-lcs (>= 1.2.0, < 2.0)
+      rspec-support (~> 3.13.0)
+    rspec-rails (7.1.1)
+      actionpack (>= 7.0)
+      activesupport (>= 7.0)
+      railties (>= 7.0)
+      rspec-core (~> 3.13)
+      rspec-expectations (~> 3.13)
+      rspec-mocks (~> 3.13)
+      rspec-support (~> 3.13)
+    rspec-support (3.13.6)
     ruby2_keywords (0.0.5)
     rufus-scheduler (3.9.2)
       fugit (~> 1.1, >= 1.11.1)
@@ -311,6 +366,10 @@ GEM
       actionpack (>= 6.1)
       activesupport (>= 6.1)
       sprockets (>= 3.0.0)
+    state_machines (0.100.4)
+    state_machines-activemodel (0.9.0)
+      activemodel (>= 6.0)
+      state_machines (>= 0.6.0)
     store_model (4.2.2)
       activerecord (>= 7.0)
     stringio (3.1.7)
@@ -322,6 +381,10 @@ GEM
     validates_timeliness (7.0.0)
       activemodel (>= 7.0.0, < 8)
       timeliness (>= 0.3.10, < 1)
+    webmock (3.26.1)
+      addressable (>= 2.8.0)
+      crack (>= 0.3.2)
+      hashdiff (>= 0.4.0, < 2.0.0)
     websocket-driver (0.8.0)
       base64
       websocket-extensions (>= 0.1.0)
@@ -343,7 +406,9 @@ PLATFORMS
 
 DEPENDENCIES
   byebug
+  dotenv-rails
   ewallet!
+  factory_bot_rails
   order_core!
   pagy (~> 6.5.0)
   payment_core!
@@ -351,7 +416,10 @@ DEPENDENCIES
   plugins!
   puma
   ransack (~> 3.1.0)
+  rspec-rails
   sprockets-rails
+  state_machines-activerecord!
+  webmock
 
 BUNDLED WITH
    2.5.11

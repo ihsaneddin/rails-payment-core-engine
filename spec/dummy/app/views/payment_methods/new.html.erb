@@ -1,0 +1,15 @@
+<section>
+  <p>Dummy Admin</p>
+  <h1>Create Payment Method</h1>
+  <p><%= link_to "Back to Payment Methods", admin_payment_methods_path %></p>
+</section>
+
+<%= form_with url: new_admin_payment_method_path, method: :get, local: true do %>
+  <div>
+    <%= label_tag :type, "Payment Method Type" %>
+    <%= select_tag :type, options_for_select(payment_method_types_for_select, payment_method_type_value), onchange: "this.form.submit()" %>
+  </div>
+  <noscript><%= submit_tag "Load Type Fields" %></noscript>
+<% end %>
+
+<%= render "form", payment_method: @payment_method %>

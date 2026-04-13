@@ -31,17 +31,23 @@ module PaymentCore
              base.include DepedencyHooks
              base.extend ClassMethods
              base.include RelationHooks
+             base.extend RelationHooks::ClassMethods
              base.include Hooks
+             base.extend Hooks::ClassMethods
 
-             base.inheritable_class_attribute :method_type, :allowed_entry_types, :direction, :requires_payable
+             base.inheritable_class_attribute :method_type, :allowed_entry_types, :direction, :requires_payable, :entry_method_data_defaults_config, :payment_method_name
              base.method_type = base.name.demodulize.underscore
+             base.payment_method_name = base.name.demodulize.underscore
+             base.eventable_bus_name = base.name.demodulize.underscore.to_sym
              base.allowed_entry_types = Set.new(['charge'])
              base.direction = :credit
+             base.entry_method_data_defaults_config = nil
 
              base.setup do
                define_metadata_class
                define_availability_rules_class
                define_entry_relations
+               register_cycle_events
              end
 
              base.include InstanceMethods
@@ -63,6 +69,8 @@ module PaymentCore
               include ::Plugins.decorators.method_decorators
               include ::Plugins.decorators.inheritables.singleton_methods
               include ::Plugins.decorators.hooks
+              include ::Plugins::EngineCallbacks
+              extend ::PaymentCore::Models::Decorators::Core
             end
           end
 
@@ -84,6 +92,10 @@ module PaymentCore
               self.allowed_entry_types += [entry_type]
             end
 
+            def remove_allowed_entry_type(entry_type)
+              self.allowed_entry_types -= [entry_type]
+            end
+
             def allows_entry_type?(entry_type)
               allowed_entry_types.include?(entry_type.to_s)
             end
@@ -102,6 +114,13 @@ module PaymentCore
               }
             end
 
+            def entry_method_data_defaults(value = nil, &block)
+              if block_given? || !value.nil?
+                self.entry_method_data_defaults_config = block_given? ? block : value
+              end
+              entry_method_data_defaults_config
+            end
+
             def setup &block
               instance_exec(&block) if block_given?
             end
@@ -114,6 +133,21 @@ module PaymentCore
 
             def define_availability_rules_class(klass= ::PaymentCore.config.payment_method.availability_rules_class_constant)
               custom_attributes_definition :availability_rules, klass, accessor: false
+            end
+
+            def register_cycle_events
+              after_create do
+                publish_callback_event(:created)
+              end
+              after_update do
+                publish_callback_event(:updated)
+              end
+              after_save do
+                publish_callback_event(:saved)
+              end
+              after_destroy do
+                publish_callback_event(:destroyed)
+              end
             end
 
           end
@@ -142,7 +176,7 @@ module PaymentCore
                 method_name = args[1]
                 opts = { source: :payment_method, if: true, exclusive: false }.merge(opts)
                 ::PaymentCore::Models::Decorators::Entry::Object.registered_classes.each do |klass|
-                  callback_for(::PaymentCore::Entry, callback_name, method_name, opts, &block)
+                  callback_for(klass, callback_name, method_name, opts, &block)
                 end
               end
 
@@ -151,7 +185,7 @@ module PaymentCore
               end
 
               entry_callback :validate do |entry|
-                entry.errors.add(:payment_method, 'Not available') unless available?(context: entry.context)
+                entry.errors.add(:payment_method, :unavailable) unless available?(context: entry.context)
               end
 
               entry_callback :validate, if: proc { payment_method && payment_method.requires_payable? } do |entry|
@@ -159,20 +193,67 @@ module PaymentCore
               end
 
               entry_callback(:validate) do |entry|
-                entry.errors.add(:payment_method, :invalid) unless self.class.allows_entry_type?(entry.class.entry_type)
+                entry.errors.add(:payment_method, :entry_type_not_allowed) unless self.class.allows_entry_type?(entry.class.entry_type)
               end
 
               entry_callback(:after_save) do |entry|
                 entry.payment_method.update_column(:last_used_at, DateTime.now) if entry.payment_method
               end
 
-              def self.inherited(subclass)
-                debugger
+              validate do
+                if holder.present? && !holder.payment_method_holder?
+                  errors.add(:holder, :invalid)
+                end
+              end
+
+              after_payment_core_initialization do
+                default_payment_methods_builder = ::PaymentCore.config.payment_method.default_payment_methods_builder
+                if default_payment_methods_builder && default_payment_methods_builder.is_a?(Proc)
+                  if ::ActiveRecord::Base.connection.table_exists?('payment_core_payment_methods')
+                    instance_exec(&default_payment_methods_builder)
+                  end
+                end
+              end
+              grape_api_resource "payment_core", default: true do
+                use_api_evaluation true
+                query_scope do |query|
+                  query.where.not(id: nil)
+                end
+                resource_params_attributes do
+                  metadata_keys = payment_method_class.store_model_klass_of(:metadata).assignable_attributes.map do |key|
+                    :"metadata_#{key}"
+                  end
+                  availability_rule_keys = payment_method_class.store_model_klass_of(:availability_rules).assignable_attributes.map(&:to_sym)
+
+                  [
+                    :type,
+                    :display_name,
+                    :label_name,
+                    :active,
+                    :always_available,
+                    :default,
+                    :holder_type,
+                    :holder_id,
+                    :reference_type,
+                    :reference_id,
+                    :use_reference,
+                    :currency,
+                    :expires_at,
+                    :external_provider
+                  ] + metadata_keys + [
+                    { availability_rules: availability_rule_keys }
+                  ]
+                end
+                presenter "PaymentCore::Grape::Presenters::PaymentMethod"
+              end
+
+            end
+            module ClassMethods
+              def inherited(subclass)
                 super(subclass)
                 subclass.method_type= subclass.name.demodulize.underscore
-                after_class_defined(subclass) do
-                  ::PaymentCore::Models::Decorators::PaymentMethod::Object << subclass
-                end
+                subclass.payment_method_name = subclass.name.demodulize.underscore
+                ::PaymentCore::Models::Decorators::PaymentMethod::Object << subclass
               end
 
             end
@@ -192,28 +273,25 @@ module PaymentCore
               scope :global, -> { where(holder: nil) }
               scope :always_available, -> { where(always_available: true) }
 
-              extend ClassMethods
+            end
 
-              module ClassMethods
-                def inherited(subclass)
-                  super(subclass)
-                  after_class_defined(subclass) do
-                    ::PaymentCore::Models::Decorators::Entry::Object.registered_classes.each do |klass|
-                      klass.setup do
-                        define_payment_method_relation(subclass)
-                      end
+            module ClassMethods
+              def inherited(subclass)
+                super(subclass)
+                after_class_defined(subclass) do
+                  ::PaymentCore::Models::Decorators::Entry::Object.registered_classes.each do |klass|
+                    klass.setup do
+                      define_payment_method_relation(subclass)
                     end
-                    # ::PaymentCore::Models::Decorators::PaymentMethodHolder.registered_classes.each do |klass|
-                    #   klass.payment_holder_setup do
-                    #     define_payment_method_relation(subclass)
-                    #   end
-                    # end
+                  end
+                  ::PaymentCore::Models::Decorators::PaymentMethodHolder.registered_classes.each do |klass|
+                    klass.payment_method_holder_setup do
+                      define_payment_method_holder_payment_method_relation(subclass)
+                    end
                   end
                 end
               end
-            end
 
-            class_methods do
               def payment_method_relation_name_on_holder
                 if self == base_class
                   :payment_methods
@@ -223,6 +301,14 @@ module PaymentCore
               end
 
               def payment_method_relation_name_on_entry
+                if self == base_class
+                  :payment_method
+                else
+                  "payment_method_#{self.name.demodulize.underscore}".to_sym
+                end
+              end
+
+              def payment_method_relation_name_on_reference
                 if self == base_class
                   :payment_method
                 else
@@ -241,8 +327,12 @@ module PaymentCore
               def define_entry_relation(klass= ::PaymentCore::Entry)
                 assoc_name = klass.entry_relation_name_on_payment_method
                 unless reflect_on_association(assoc_name)
+                  scope = nil
+                  unless klass == klass.base_class
+                    scope = -> { where(type: klass.name) }
+                  end
                   has_many(
-                    assoc_name, -> { where(type: sub.name) },
+                    assoc_name, scope,
                     class_name: klass.name, foreign_key: :payment_method_id, inverse_of: :payment_method,
                     extend: ::Plugins::Models::Extensions::Association::HasManyStiBuildersPatch.call(klass.name), dependent: :nullify
                   )
@@ -253,8 +343,14 @@ module PaymentCore
 
           module InstanceMethods
 
+            def entry_method_data_defaults
+              defaults = self.class.entry_method_data_defaults
+              defaults = instance_exec(&defaults) if defaults.is_a?(Proc)
+              defaults || {}
+            end
+
             def method_missing(method_name, *args, &block)
-              registered_types = ::PaymentCore::Models::Decorators::Payment::Object.registered_method_types.to_a.map{|type| "#{type}?" }
+              registered_types = ::PaymentCore::Models::Decorators::PaymentMethod::Object.registered_method_types.to_a.map{|type| "#{type}?" }
               if method_name.to_s.chomp("?") && registered_types.include?(method_name.to_s)
                 if method_name.to_s == "kind_of_#{self.class.method_type}?"
                    self.class.super_class.method_type.to_s == self.class.method_type
@@ -292,11 +388,20 @@ module PaymentCore
             end
 
             def processor(context: nil, payer: nil)
-              @processor ||= ::PaymentCore.config.payment_processor_registry.resolve(self.method_type).new(self, **{ context: context, payer: payer })
+              @processor ||= custom_processor_class || ::PaymentCore.config.payment_processor_registry.resolve(self.method_type).new(self, **{ context: context, payer: payer })
+            end
+
+            def custom_processor_class
+              metadata.processor_class ? metadata.processor_class.constantize : nil
             end
 
             def requires_payable?
               self.class.requires_payable?
+            end
+
+            def publish_callback_event(ename)
+              publish_event(ename, prefix: "", bus: self.class.base_class.eventable_bus_name)
+              publish_event(ename)
             end
 
           end

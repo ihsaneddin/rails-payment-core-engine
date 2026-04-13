@@ -1,0 +1,19 @@
+<section>
+  <p>Dummy Admin</p>
+  <h1>Payment Entry Detail</h1>
+  <p><%= link_to "Back to Entries", admin_entries_path %></p>
+</section>
+
+<dl>
+  <dt>ID</dt>
+  <dd><%= @entry.id %></dd>
+
+  <dt>Type</dt>
+  <dd><%= @entry.class.entry_type %></dd>
+
+  <dt>State</dt>
+  <dd><%= @entry.state %></dd>
+
+  <dt>Payment Method</dt>
+  <dd><%= @entry.payment_method&.display_name || @entry.payment_method&.method_type %></dd>
+</dl>

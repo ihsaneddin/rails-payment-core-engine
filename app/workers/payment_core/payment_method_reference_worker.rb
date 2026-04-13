@@ -6,7 +6,7 @@ module PaymentCore
 
     def attributes_sync(reference_class, reference_id)
       ref_constant = reference_class.constantize
-      return if ref_constant.include?(PaymentCore.decorators.payment_method_reference_object)
+      return if ref_constant.try(:payment_method_reference?)
       ref = ref_constant.find(reference_id)
       if ref
         ref.sync_payment_method

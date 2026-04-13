@@ -3,8 +3,11 @@ module PaymentCore
     module Helpers
       autoload :Authenticate, "payment_core/grape/helpers/authenticate"
       autoload :Authorize, "payment_core/grape/helpers/authorize"
-      autoload :CurrentHolder, "payment_core/grape/helpers/current_holder"
+      autoload :Entries, "payment_core/grape/helpers/entries"
       autoload :PaymentMethods, "payment_core/grape/helpers/payment_methods"
+      autoload :PaymentMethodHolders, "payment_core/grape/helpers/payment_method_holders"
+      autoload :Payables, "payment_core/grape/helpers/payables"
+
 
       def self.included(base)
         base.helpers HelperMethods

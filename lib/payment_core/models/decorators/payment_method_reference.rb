@@ -2,25 +2,15 @@ module PaymentCore
   module Models
     module Decorators
       module PaymentMethodReference
-        mattr_accessor :reference_classes
-        @@reference_classes = Set.new
 
-        def self.<<(klass)
-          @@reference_classes << klass #unless @@reference_classes.include?(klass)
-        end
+        extend ::Plugins::Decorators::ConfigBuilder
+        include ::Plugins.decorators.registered
 
         def self.included(base)
-          base.include ::Plugins.decorators.inheritables
-          method_name = :payment_method_reference?
-          base.define_inheritable_singleton_method(method_name) { false } unless base.respond_to?(method_name)
-
-          unless base.method_defined?(method_name)
-            base.define_method(method_name) do
-              self.class.send(method_name)
-            end
-          end
-
           base.extend ClassMethods
+          base.define_method :payment_method_reference? do
+            self.class.payment_method_reference?
+          end
         end
 
         def self.default_options
@@ -63,19 +53,95 @@ module PaymentCore
             opts[:functions] = ::Plugins::Models::Concerns::Config.build(**functions)
             opts[:payment_method_class] = payment_method_class.name
 
-            default_opts = ::PaymentCore.decorators.payment_method_reference.default_options
-            ::Plugins::Models::Concerns::Config.setup(self, 'payment_method_reference_config', opts, default_opts,
+            default_opts = ::PaymentCore::Models::Decorators::PaymentMethodReference.default_options
+            ::PaymentCore::Models::Decorators::PaymentMethodReference.plugins_config.setup(self, 'payment_method_reference_config', opts, default_opts,
                                                       method_prefix: 'payment_method_reference', &block)
 
-            unless reflect_on_association(:payment_method)
-              has_one :payment_method, class_name: payment_method_class.name, as: :reference
-              assoc_name = "payment_method_reference_of_#{base_class.name.demodulize.underscore}"
-              ::PaymentCore::PaymentMethod.define_alternative_polymorphic_parent_association assoc: :reference,
-                                                                                             new_assoc: assoc_name, base_class: base_class
+            include DepedencyHooks
+            include Hooks
+            extend Hooks::ClassMethods
+            include RelationHooks
+            extend RelationHooks::ClassMethods
+            include PaymentMethodCallbacks
+
+            payment_method_reference_setup do
+              define_payment_method_relations
             end
 
-            include ::Plugins.decorators.method_annotations
+            define_inheritable_singleton_method(:payment_method_reference?) { true }
+            ::PaymentCore::Models::Decorators::PaymentMethodReference << self
 
+            include InstanceMethods
+
+          end
+
+          def payment_method_reference?
+            false
+          end
+        end
+
+        module DepedencyHooks
+          extend ActiveSupport::Concern
+          included do
+            include ::Plugins.decorators.method_annotations
+            include ::Plugins.decorators.inheritables
+            include ::Plugins.decorators.hooks
+            include ::Plugins::Models::Concerns::ApiResource
+          end
+        end
+
+        module Hooks
+          extend ActiveSupport::Concern
+          included do
+            grape_api_resource "payment_core", default: true do
+              presenter "PaymentCore::Grape::Presenters::PaymentMethodReference"
+            end
+          end
+          module ClassMethods
+
+            def inherited(subclass)
+              super(subclass)
+              after_class_defined(subclass) do
+                ::PaymentCore::Models::Decorators::PaymentMethodReference << subclass
+              end
+            end
+
+            def payment_method_reference_setup &block
+              block_given? ? instance_exec(&block) : nil
+            end
+
+          end
+        end
+
+        module RelationHooks
+          extend ActiveSupport::Concern
+
+          included do
+
+          end
+          module ClassMethods
+
+            private
+
+            def define_payment_method_relations
+              ::PaymentCore::Models::Decorators::PaymentMethod::Object.registered_classes.each do |klass|
+                define_payment_method_relation(klass)
+              end
+            end
+
+            def define_payment_method_relation(klass=::PaymentCore::PaymentMethod)
+              assoc_name = klass.payment_method_relation_name_on_reference
+              unless reflect_on_association(assoc_name)
+                has_one assoc_name, class_name: klass.name, as: :reference
+                klass.define_alternative_of_relation(self, relation: :reference)
+              end
+            end
+          end
+        end
+
+        module PaymentMethodCallbacks
+          extend ActiveSupport::Concern
+          included do
             define_inheritable_singleton_method :payment_method_availability do |method_name = nil, method_types: :all, &block|
               method_name ||= :"payment_method_availability_#{SecureRandom.hex(8)}"
               annotate_method(method_name, payment_method_availability: true, method_types: method_types, &block)
@@ -87,30 +153,6 @@ module PaymentCore
 
             define_inheritable_singleton_method :payment_method_for do |payment_method_type|
               methods_annotated_with(:payment_method, payment_method_type)[0]
-            end
-
-            define_inheritable_singleton_method(:payment_method_reference?) { true }
-            include InstanceMethods
-            include InheritableHook
-            include ::Plugins::Models::Concerns::ApiResource unless include?(::Plugins::Models::Concerns::ApiResource)
-
-            grape_api_resource "payment_core", default: true do
-              presenter "PaymentCore::Grape::Presenters::PaymentMethodReference"
-            end
-
-            ::PaymentCore.decorators.payment_method_reference << self
-          end
-        end
-
-        module InheritableHook
-          extend ActiveSupport::Concern
-
-          included do
-            class << self
-              def inherited(subclass)
-                super(subclass)
-                ::PaymentCore.decorators.payment_method_reference << subclass
-              end
             end
           end
         end

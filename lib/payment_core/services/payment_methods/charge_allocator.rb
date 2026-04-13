@@ -128,7 +128,7 @@ module PaymentCore
                   available_payment_methods = sorted_payment_methods.select do |pm|
                     config.availability(pm, component)
                   end
-                  
+
                   next if available_payment_methods.empty?
 
                   component_allocations = []
@@ -142,7 +142,7 @@ module PaymentCore
                   allocations.concat(component_allocations)
                 end
               end
-              
+
 
               allocations
             end
@@ -227,7 +227,7 @@ module PaymentCore
                 else
                   allocated_base_amount = available_method_amount
                 end
-                next if allocated_base_amount.zero?
+                next if allocated_base_amount.zero? #|| allocated_base_amount > available_method_amount
 
                 allocations << Allocation.new(
                   payable: payable,

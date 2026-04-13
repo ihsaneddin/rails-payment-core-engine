@@ -12,7 +12,6 @@ module PaymentCore
       end
 
       custom_attributes_definition :metadata, Metadata, accessor: true, prefix: ''
-
       uses_reference(required: true, use_reference: true, use_reference_attributes: true)
       expirable(required: false)
       refundable
@@ -46,7 +45,7 @@ module PaymentCore
       end
 
       entry_callback :validate, if: proc { payable.present? } do |entry|
-        entry.errors.add(:balance, 'Insufficient balance') if entry.charge? && (entry.payment_method_amount > balance)
+        entry.errors.add(:balance, 'Insufficient balance') if entry.charge? && (entry.payment_method_amount > balance) && entry.state_will_be_succeeded?
       end
 
       entry_callback :validate do |entry|

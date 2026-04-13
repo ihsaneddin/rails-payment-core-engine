@@ -10,17 +10,34 @@ class Order < OrderCore::Order
     #   components = Array(payable_components).flatten
     #   payable_charge_entries.where(payable: components).succeeded.sum(:amount)
     # end
-    currency "RM"
+    currency "MYR"
     components do
       line_items
     end
-  end
-
-  payable_entries_callback :after_save do |entry|
-    if entry.charge? && entry.after_state_succeeded?
-      complete!
+    entry_requirements do
+      bank_transfer_charge_requires_proof true
+      bank_transfer_charge_requires_verification true
+      fiuu_charge_payment_method_data do
+        value do
+          {
+            email: customer&.email,
+            name: customer&.name,
+            phone: customer&.phone_number,
+            country: "MY"
+          }
+        end
+      end
+    end
+    events do
+      entry do
+        saved do |entry|
+          complete! if entry.charge? && entry.after_state_succeeded?
+        end
+      end
     end
   end
+
+  after_save :create_payment_intent_for_waiting_payment
 
   acts_as_ewallet_entry_reference
 
@@ -44,7 +61,18 @@ class Order < OrderCore::Order
     state.present? && saved_change_to_state? && state == 'completed'
   end
 
-  publishes_event :completedd, on: :complete!, bus: :order
+  def create_payment_intent_for_waiting_payment
+    return unless saved_change_to_state?
+    return unless state == "waiting_payment"
+    return if active_payable_payment_intent.present?
+
+    PaymentCore::PaymentIntent.create!(
+      payable: self,
+      currency: payable_currency || "MYR"
+    )
+  end
+
+  publishes_event :completed, on: :complete!, bus: :order
 
   payment_method_availability do |payment_method, context|
     line_items.any? do |line_item|

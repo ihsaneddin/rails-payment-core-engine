@@ -1,0 +1,85 @@
+<%= form_with url: (payment_method.persisted? ? admin_payment_method_path(payment_method) : admin_payment_methods_path),
+              scope: :payment_method,
+              method: (payment_method.persisted? ? :put : :post),
+              local: true do |f| %>
+  <%= f.hidden_field :type, value: payment_method_type_value %>
+
+  <fieldset>
+    <legend>Payment Method Setup</legend>
+
+    <div>
+      <%= label_tag :selected_type, "Selected Type" %>
+      <%= text_field_tag :selected_type, payment_method_type_value, disabled: true %>
+    </div>
+
+    <div>
+      <%= f.label :display_name %>
+      <%= f.text_field :display_name %>
+    </div>
+
+    <div>
+      <%= f.label :label_name %>
+      <%= f.text_field :label_name %>
+    </div>
+
+    <div>
+      <%= f.label :holder_type %>
+      <%= f.text_field :holder_type %>
+    </div>
+
+    <div>
+      <%= f.label :holder_id %>
+      <%= f.number_field :holder_id %>
+    </div>
+
+    <div>
+      <%= f.label :currency %>
+      <%= f.text_field :currency %>
+    </div>
+
+    <div>
+      <%= f.label :external_provider %>
+      <%= f.text_field :external_provider %>
+    </div>
+
+    <div>
+      <%= f.label :active %>
+      <%= f.check_box :active %>
+    </div>
+
+    <div>
+      <%= f.label :always_available %>
+      <%= f.check_box :always_available %>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Metadata Mapping</legend>
+    <% metadata_fields_for_form(payment_method.class).each do |field| %>
+      <div>
+        <%= label_tag "payment_method_metadata_#{field[:name]}", field[:label] %>
+        <% if field[:input] == :checkbox %>
+          <%= check_box_tag "payment_method[metadata_#{field[:name]}]", "1", ActiveModel::Type::Boolean.new.cast(field[:value]) %>
+        <% elsif field[:input] == :json %>
+          <%= text_area_tag "payment_method[metadata_#{field[:name]}]", field[:value], rows: 6 %>
+        <% else %>
+          <%= text_area_tag "payment_method[metadata_#{field[:name]}]", field[:value], rows: field[:input] == :list ? 3 : 1 %>
+        <% end %>
+      </div>
+    <% end %>
+  </fieldset>
+
+  <fieldset>
+    <legend>Availability Rules Mapping</legend>
+    <% availability_rule_fields_for_form(payment_method.class).each do |field| %>
+      <div>
+        <%= label_tag "payment_method_availability_rules_#{field[:name]}", field[:label] %>
+        <%= text_area_tag "payment_method[availability_rules][#{field[:name]}]", field[:value], rows: field[:input] == :json ? 6 : 3 %>
+      </div>
+    <% end %>
+  </fieldset>
+
+  <div>
+    <%= f.submit(payment_method.persisted? ? "Update Payment Method" : "Create Payment Method") %>
+  </div>
+<% end %>

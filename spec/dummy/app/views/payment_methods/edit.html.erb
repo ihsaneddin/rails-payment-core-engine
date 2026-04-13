@@ -1,0 +1,7 @@
+<section>
+  <p>Dummy Admin</p>
+  <h1>Edit Payment Method</h1>
+  <p><%= link_to "Back to Payment Method", admin_payment_method_path(@payment_method) %></p>
+</section>
+
+<%= render "form", payment_method: @payment_method %>

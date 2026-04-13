@@ -4,6 +4,7 @@ require 'alba'
 require 'plugins'
 require 'grape'
 require 'grape-entity'
+require 'state_machines-activerecord'
 
 module PaymentCore
 
@@ -12,9 +13,12 @@ module PaymentCore
   autoload :Models, "payment_core/models"
   autoload :Services, "payment_core/services"
   autoload :Processors, "payment_core/processors"
+  autoload :Gateways, "payment_core/gateways"
   autoload :Grape, "payment_core/grape"
   autoload :Errors, "payment_core/errors"
   autoload :Decorators, 'payment_core/decorators'
+  autoload :AttributeTypes, "payment_core/attribute_types"
+  autoload :Subscribers, "payment_core/subscribers"
 
   mattr_accessor :configuration
   @@configuration = Configuration
@@ -33,4 +37,5 @@ module PaymentCore
 
 end
 
+require "payment_core/subscribers"
 require "payment_core/railtie"

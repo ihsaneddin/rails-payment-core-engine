@@ -2,19 +2,15 @@ module PaymentCore
   module Models
     module Decorators
       module PaymentMethodHolder
-        mattr_accessor :holder_classes
-        @@holder_classes = Set.new
 
-        def self.<<(klass)
-          @@holder_classes << klass #unless @@holder_classes.include?(klass)
-        end
+        extend ::Plugins::Decorators::ConfigBuilder
+        include ::Plugins.decorators.registered
 
         def self.included(base)
-          base.define_method :payment_method_holder? do
-            false
-          end
-          base.include ::Plugins.decorators.inheritables
           base.extend ClassMethods
+          base.define_method :payment_method_holder? do
+            self.class.payment_method_holder?
+          end
         end
 
         def self.default_options
@@ -23,12 +19,15 @@ module PaymentCore
             email: nil,
             phone_number: nil,
             address: nil,
+            type: proc {
+              self.name.demodulize.underscore
+            },
             default_payment_method: proc {
               payment_methods.active.find_by(default: true)
             },
             payment_method_candidates: proc {
               payment_methods.active.or(::PaymentCore::PaymentMethod.global.active.always_available)
-              .includes(::PaymentCore::PaymentMethod.reference_classes.keys.map(&:to_sym))
+              .includes((::PaymentCore::PaymentMethod.try(:reference_classes)|| {}).keys.map(&:to_sym))
             },
             available_payment_method: proc { |context: nil|
               payment_method_candidates.select do |pm|
@@ -36,12 +35,21 @@ module PaymentCore
               end
             },
             api: ::PaymentCore.config.plugins_config.build(**{
+              enabled: true,
               finder: proc { |holder_id|
                 find(holder_id)
               },
-              type: proc {
-                      name.demodulize.underscore
-                    }
+              path: proc {
+                name.demodulize.underscore.pluralize
+              }
+            }),
+            events: plugins_config.build(**{
+              payment_method: plugins_config.build(**{
+                created: nil,
+                updated: nil,
+                saved: nil,
+                destroyed: nil
+              })
             })
           }
         end
@@ -50,48 +58,119 @@ module PaymentCore
           def payment_method_holder(**opts, &block)
             # unless ::ActiveRecord::Base.connection.table_exists?('payment_core_payment_methods')
 
-            default_opts = ::PaymentCore.decorators.payment_method_holder.default_options
-            ::Plugins::Models::Concerns::Config.setup(self, 'payment_method_holder_config', opts, default_opts,
+            default_opts = ::PaymentCore::Models::Decorators::PaymentMethodHolder.default_options
+            ::PaymentCore::Models::Decorators::PaymentMethodHolder.plugins_config.setup(self, 'payment_method_holder_config', opts, default_opts,
                                                       method_prefix: 'payment_method_holder', &block)
 
-            unless reflect_on_association(:payment_methods)
-              has_many :payment_methods, class_name: 'PaymentCore::PaymentMethod', as: :holder
-              ::PaymentCore::PaymentMethod.descendants.each { |sub| define_payment_method_subclass_relation(sub) }
-              assoc_name = "payment_method_holder_of_#{base_class.name.demodulize.underscore}"
-              ::PaymentCore::PaymentMethod.define_alternative_polymorphic_parent_association assoc: :holder,
-                                                                                             new_assoc: assoc_name, base_class: base_class
+            include DepedencyHooks
+            include Hooks
+            extend Hooks::ClassMethods
+            include RelationHooks
+            extend RelationHooks::ClassMethods
+            extend PaymentMethodCallbacks
+
+            inheritable_class_attribute :payment_method_holder_type
+            self.payment_method_holder_type = name.demodulize.underscore
+
+            payment_method_holder_setup do
+              define_payment_method_holder_payment_method_relations
+              define_payment_method_holder_entry_relations
             end
 
-            unless reflect_on_association(:payment_entries)
-              has_many :payment_entries, class_name: 'PaymentCore::Entry', as: :payer
-            end
+            ::PaymentCore::Models::Decorators::PaymentMethodHolder << self
 
-            include ::Plugins.decorators.method_annotations
-            define_inheritable_singleton_method :payment_method_availability do |method_name, &block|
-              annotate_method(method_name, payment_method_availability: true, &block)
-            end
+            define_inheritable_singleton_method(:payment_method_holder?) { true }
 
             include InstanceMethods
-            include InheritableHook
-            ::PaymentCore.decorators.payment_method_holder << self
           end
 
-          def define_payment_method_subclass_relation(sub)
-            unless reflect_on_association("payment_method_#{sub.method_type.pluralize}".to_sym)
-              has_many "payment_method_#{sub.method_type.pluralize}".to_sym, class_name: sub.name, as: :holder
-            end
+          def payment_method_holder?
+            false
+          end
+
+        end
+
+        module DepedencyHooks
+          extend ActiveSupport::Concern
+          included do
+            include ::Plugins.decorators.method_annotations
+            include ::Plugins.decorators.inheritables
+            include ::Plugins.decorators.hooks
+            include ::Plugins::Models::Concerns::ApiResource
           end
         end
 
-        module InheritableHook
+        module Hooks
+
+          extend ActiveSupport::Concern
+          included do
+            grape_api_resource "payment_core" do
+              presenter "PaymentCore::Grape::Presenters::PaymentMethodHolder"
+            end
+          end
+          module ClassMethods
+
+            def inherited(subclass)
+              super(subclass)
+              after_class_defined(subclass) do
+                ::PaymentCore::Models::Decorators::PaymentMethodHolder << subclass
+              end
+            end
+
+            def payment_method_holder_setup &block
+              block_given? ? instance_exec(&block) : nil
+            end
+
+          end
+        end
+
+        module RelationHooks
           extend ActiveSupport::Concern
 
           included do
-            class << self
-              def inherited(subclass)
-                super(subclass)
-                ::PaymentCore.decorators.payment_method_holder << subclass
+
+          end
+          module ClassMethods
+
+            private
+
+            def define_payment_method_holder_payment_method_relations
+              ::PaymentCore::Models::Decorators::PaymentMethod::Object.registered_classes.each do |klass|
+                define_payment_method_holder_payment_method_relation
               end
+            end
+
+            def define_payment_method_holder_payment_method_relation(klass = ::PaymentCore::PaymentMethod)
+              assoc_name = klass.payment_method_relation_name_on_holder
+              unless reflect_on_association(assoc_name)
+                has_many assoc_name, class_name: klass.name, as: :holder
+                klass.define_alternative_of_relation(self, relation: :holder)
+              end
+            end
+
+            def define_payment_method_holder_entry_relations
+              ::PaymentCore::Models::Decorators::Entry::Object.registered_classes.each do |klass|
+                define_payment_method_holder_entry_relation
+              end
+            end
+
+            def define_payment_method_holder_entry_relation(klass= ::PaymentCore::Entry)
+              assoc_name = klass.entry_relation_name_on_holder
+              unless reflect_on_association(assoc_name)
+                has_many assoc_name,
+                  through: ::PaymentCore::PaymentMethod.payment_method_relation_name_on_holder,
+                  source: klass.entry_relation_name_on_payment_method
+              end
+            end
+
+          end
+        end
+
+        module PaymentMethodCallbacks
+          extend ActiveSupport::Concern
+          included do
+            define_inheritable_singleton_method :payment_method_availability do |method_name, &block|
+              annotate_method(method_name, payment_method_availability: true, &block)
             end
           end
         end
@@ -123,9 +202,6 @@ module PaymentCore
             #   end
           end
 
-          def payment_method_holder?
-            true
-          end
         end
       end
     end

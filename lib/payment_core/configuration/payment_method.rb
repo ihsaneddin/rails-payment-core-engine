@@ -9,6 +9,9 @@ module PaymentCore
       mattr_accessor :default_payment_methods_builder
       mattr_accessor :default_context_builder
       mattr_accessor :processor_action_params
+      mattr_accessor :processor_webhook_action_params
+      mattr_accessor :credentials_encryption_key
+      mattr_accessor :webhook_sla_seconds
 
       @@metadata_base_class = "PaymentCore::Attributes::PaymentMethods::Metadata"
       @@availability_rules_class = "PaymentCore::Attributes::PaymentMethods::AvailabilityRules"
@@ -21,6 +24,11 @@ module PaymentCore
       @@processor_action_params = proc {
         {}
       }
+      @@processor_webhook_action_params = proc {
+        {}
+      }
+      @@credentials_encryption_key = proc { Rails.application.credentials.secret_key_base }
+      @@webhook_sla_seconds = 120 * 60
       @@default_payment_methods_builder = proc {
         if PaymentCore::PaymentMethod.where.not(id: nil).empty?
           PaymentCore::PaymentMethods::Cash.create(display_name: "Cash", active: true, always_available: true)
@@ -64,6 +72,34 @@ module PaymentCore
           @@processor_action_params = block
         else
           @@processor_action_params
+        end
+      end
+
+      def self.processor_webhook_action_params &block
+        if block_given?
+          @@processor_webhook_action_params = block
+        else
+          @@processor_webhook_action_params
+        end
+      end
+
+      def self.credentials_encryption_key(value = nil, &block)
+        if block_given?
+          @@credentials_encryption_key = block
+        elsif !value.nil?
+          @@credentials_encryption_key = value
+        else
+          @@credentials_encryption_key
+        end
+      end
+
+      def self.webhook_sla_seconds(value = nil, &block)
+        if block_given?
+          @@webhook_sla_seconds = block
+        elsif !value.nil?
+          @@webhook_sla_seconds = value
+        else
+          @@webhook_sla_seconds
         end
       end
 

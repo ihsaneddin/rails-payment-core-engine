@@ -1,6 +1,18 @@
-# Sample configuration file for Sidekiq.
-# Options here can still be overridden by cmd line args.
-# sidekiq -C config.yml
-:verbose: true
-:queues:
-  - [payment]
+:versions:
+  5:
+    intent_expiration:
+      class: PaymentCore::PaymentIntentWorker
+      cron: '30 23 * * *'
+      # cron: '* * * * *'
+      include_metadata: true,
+      args: [nil,'schedule']
+      keyword_argument: true
+      queue: payment_core
+  4:
+    intent_expiration:
+      class: PaymentCore::PaymentIntentWorker
+      cron: '30 23 * * *'
+      # cron: '* * * * *'
+      include_metadata: true,
+      args: [nil,'schedule']
+      queue: payment_core

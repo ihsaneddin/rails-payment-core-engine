@@ -1,0 +1,33 @@
+<section>
+  <p>Dummy Admin</p>
+  <h1>Payment Method Workspace</h1>
+  <p><%= link_to "Create Payment Method", new_admin_payment_method_path %></p>
+</section>
+
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Type</th>
+      <th>Display Name</th>
+      <th>Holder</th>
+      <th>Status</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @payment_methods.each do |payment_method| %>
+      <tr>
+        <td><%= payment_method.id %></td>
+        <td><%= payment_method.method_type.to_s.humanize %></td>
+        <td><%= payment_method.display_name %></td>
+        <td><%= [payment_method.holder_type, payment_method.holder_id].compact.join("#") %></td>
+        <td><%= payment_method.active? ? "Active" : "Inactive" %></td>
+        <td>
+          <%= link_to "Open", admin_payment_method_path(payment_method) %>
+          <%= link_to "Edit", edit_admin_payment_method_path(payment_method) %>
+        </td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>

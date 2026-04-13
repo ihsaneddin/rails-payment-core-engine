@@ -33,6 +33,10 @@ module PaymentCore
 
             end
 
+            def expirable?
+              false
+            end
+
           end
 
           module InstanceMethods

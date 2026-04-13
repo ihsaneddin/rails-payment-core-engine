@@ -3,10 +3,10 @@ module PaymentCore
     autoload :Api, "payment_core/configuration/api"
     autoload :GrapeApi, "payment_core/configuration/grape_api"
     autoload :Permissions, "payment_core/configuration/permissions"
-    autoload :Models, "payment_core/configuration/models"
     autoload :ProcessorRegistry, "payment_core/configuration/processor_registry"
     autoload :Entry, "payment_core/configuration/entry"
     autoload :PaymentMethod, "payment_core/configuration/payment_method"
+    autoload :PaymentIntent, "payment_core/configuration/payment_intent"
 
     include Plugins::Configuration::Core
 
@@ -21,9 +21,6 @@ module PaymentCore
 
     mattr_accessor :enabled_api
     @@enabled_api = :grape
-
-    mattr_accessor :models
-    @@models = ::PaymentCore::Configuration::Models.new
 
     mattr_accessor :application_record_base
     @@application_record_base = "PaymentCore::ApplicationRecord"
@@ -43,6 +40,9 @@ module PaymentCore
 
     mattr_accessor :payment_method
     @@payment_method = ::PaymentCore::Configuration::PaymentMethod
+
+    mattr_accessor :payment_intent
+    @@payment_intent = ::PaymentCore::Configuration::PaymentIntent
 
     def self.payment_processor_registry &block
       if block_given?
@@ -73,6 +73,14 @@ module PaymentCore
         @@payment_method.setup(&block)
       else
          @@payment_method
+      end
+    end
+
+    def self.payment_intent &block
+      if block_given?
+        @@payment_intent.setup(&block)
+      else
+         @@payment_intent
       end
     end
 

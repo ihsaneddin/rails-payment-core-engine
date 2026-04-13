@@ -8,9 +8,24 @@ module PaymentCore
           base.rescue_from ::PaymentCore::Errors::UnknownProcessorActionError, ::PaymentCore::Errors::UnknownProcessorError do |e|
             standard_not_found_error(message: e.message)
           end
+          base.rescue_from ::PaymentCore::Errors::ProcessorActionNotAllowed do |_e|
+            standard_permission_denied_error
+          end
         end
 
         module HelperMethods
+
+          def payment_method_class_finder
+          ::PaymentCore::Models::Decorators::PaymentMethod::Object.registered_classes.find{|klass| klass.payment_method_name.to_s.singularize == class_context.payment_method_name.to_s.singularize}
+          end
+
+          def payment_method_class
+            unless @payment_method_class
+              @payment_method_class = payment_method_class_finder
+              raise ::ActiveRecord::RecordNotFound unless @payment_method_class
+            end
+            @payment_method_class
+          end
 
           def processor_action?
             route.options[:processor_action]
@@ -26,11 +41,11 @@ module PaymentCore
 
           def processor_action_name
             prefix = processor_collective_action? ? "collective" : nil
-            [prefix, params[:processor_action]].compact.join("_")
+            @processor_action_name ||= [prefix, params[:processor_action]].compact.join("_")
           end
 
           def processor_action_arguments
-            permitted = processor.params_for(processor_action_name.to_sym)
+            permitted = processor.params_for((params[:processor_action] || "action").to_sym, type: processor_collective_action? ? :collective : nil)
             permitted = posts.permit(*permitted)
             opts = ::PaymentCore.config.payment_method.processor_action_params
             args = [permitted, given_context]
@@ -43,7 +58,17 @@ module PaymentCore
             args
           end
 
+          def processor_action_accesses
+            klass = class_context
+            if klass && klass <= ::PaymentCore::Grape::Resources::PaymentMethods
+              klass.processor_action_accesses || []
+            else
+              klass.try(:processor_action_accesses) || []
+            end
+          end
+
           def processor
+            return @processor if @processor
             if processor_collective_action?
               payment_methods = records.where(method_type: payment_method_type)
               unless params[:payment_method_ids].blank?
@@ -55,17 +80,18 @@ module PaymentCore
               @processor ||=
                 record.processor(context: given_context, payer: current_holder)
             end
+            unless @processor.single_action?(processor_action_name) || @processor.collective_action?(processor_action_name)
+              standard_not_found_error(message: "Not found")
+            end
+            @processor
           rescue => e
             standard_not_found_error(message: e.message)
           end
 
           def given_context
             return @context if @context
-            builder = ::PaymentCore.config.payment_method.default_context_builder
-            context_opts = params[:context] || {}
-            context_opts[:payables] = payables(context_opts[:payables])
-            context_opts = { user: current_user, data: params }.merge(context_opts)
-            @context = builder.is_a?(Proc) ? instance_exec(context_opts, &builder) : builder
+            context_builder = class_context.try(:given_context)
+            @context = context_builder.is_a?(Proc) ? instance_exec(&context_builder) : context_builder
           end
 
           def payables(payable_params = {})
@@ -79,7 +105,7 @@ module PaymentCore
 
           def payable_class(payable_type)
             payable_type.safe_constantize ||
-            ::PaymentCore.decorators.payable.payable_classes.find{|klass| klass.payable_api.type == payable_type } ||
+            ::PaymentCore::Models::Decorators::Payable.registered_classes.find{|klass| klass.payable_config.tipe == payable_type } ||
             raise { ::ActiveRecord::RecordNotFound }
           end
 

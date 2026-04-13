@@ -46,12 +46,14 @@ module PaymentCore
         end
 
         PaymentCore::Entry.wrap( entries, { amount: params[:amount], partial: params[:partial], payer: payer, payable: payable, metadata: params[:metadata] }) do |entry|
-          entry.success!
+          entry.success
         end
 
       end
 
-      params :charge_params, collective: true do
+      action_access :charge, :public
+
+      params :charge_params, type: :collective do
         [:amount, :currency, :payable_id, :payable_type, :payable, :partial, :description]
       end
 
@@ -88,16 +90,18 @@ module PaymentCore
             currency: params[:currency] || payable.payable_currency,
             description: params[:description],
             context: context,
-            metadata: params[:metadata] || {}
+            metadata: params[:metadata] || {},
+            partial: true,
           )
           entries << entry
         end
 
         PaymentCore::Entry.wrap( entries, { amount: params[:amount], partial: params[:partial], payer: payer, payable: payable, metadata: params[:metadata] }) do |entry|
-          entry.success!
+          entry.success
         end
 
       end
+
 
       params :refund_params do
         [:payable_id, :payable_type, :payable, :description]
@@ -110,14 +114,15 @@ module PaymentCore
         end
 
         refund = PaymentCore::Entries::Refund.new(use_payable_data: true, payable: payable, description: params[:description])
-        refund.success!
+        refund.success
         refund
       end
 
 
+
       def payable_class payable_type
         payable_type.safe_constantize ||
-        ::PaymentCore.decorators.payable.payable_classes.find{|klass| klass.payable_api.type == payable_type } ||
+        ::PaymentCore::Models::Decorators::Payable.registered_classes.find{|klass| klass.payable_config.tipe == payable_type } ||
         raise { ::ActiveRecord::RecordNotFound }
       end
 

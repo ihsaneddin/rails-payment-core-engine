@@ -1,0 +1,26 @@
+<h1>Entries</h1>
+
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Type</th>
+      <th>State</th>
+      <th>Payment Method</th>
+      <th>Holder</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @entries.each do |entry| %>
+      <tr>
+        <td><%= entry.id %></td>
+        <td><%= entry.class.entry_type %></td>
+        <td><%= entry.state %></td>
+        <td><%= entry.payment_method&.display_name || entry.payment_method&.method_type %></td>
+        <td><%= [entry.payer_type, entry.payer_id].compact.join("#") %></td>
+        <td><%= link_to "Show", admin_entry_path(id: entry.id) %></td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>

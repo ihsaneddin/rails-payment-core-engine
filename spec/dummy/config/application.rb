@@ -11,9 +11,11 @@ require "payment_core"
 module Dummy
   class Application < Rails::Application
     config.load_defaults Rails::VERSION::STRING.to_f
+    #Rails.autoloaders.log!
 
     # For compatibility with applications that use this config
     config.action_controller.include_all_helpers = false
+    config.active_support.isolation_level = :fiber
 
     # Configuration for the application, engines, and railties goes here.
     #
@@ -23,6 +25,5 @@ module Dummy
     # config.time_zone = "Central Time (US & Canada)"
     # config.eager_load_paths << Rails.root.join("extras")
     #
-    config.eager_load_paths << Rails.root.join("lib")
   end
 end

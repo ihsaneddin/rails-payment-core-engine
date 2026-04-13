@@ -1,0 +1,23 @@
+<h1>Entry</h1>
+
+<p><%= link_to "Back", admin_entries_path %></p>
+
+<dl>
+  <dt>ID</dt>
+  <dd><%= @entry.id %></dd>
+
+  <dt>Type</dt>
+  <dd><%= @entry.class.entry_type %></dd>
+
+  <dt>State</dt>
+  <dd><%= @entry.state %></dd>
+
+  <dt>Payment Method</dt>
+  <dd><%= @entry.payment_method&.display_name || @entry.payment_method&.method_type %></dd>
+
+  <dt>Holder</dt>
+  <dd><%= [@entry.payer_type, @entry.payer_id].compact.join("#") %></dd>
+
+  <dt>Payable</dt>
+  <dd><%= [@entry.payable_type, @entry.payable_id].compact.join("#") %></dd>
+</dl>

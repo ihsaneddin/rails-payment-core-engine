@@ -1,0 +1,41 @@
+en:
+  activerecord:
+    models:
+      payment_core/entry: "Entry"
+      payment_core/payment_method: "Payment method"
+      payment_core/payment_intent: "Payment intent"
+    errors:
+      models:
+        payment_core/entry:
+          attributes:
+            base:
+              proof_is_required: "Proof is required"
+            id:
+              wrap_failed: "is invalid"
+            payment_method:
+              entry_type_not_allowed: "is not allowed for this entry type"
+              unavailable: "is not available"
+            payment_intent:
+              required: "is required"
+              invalid: "is invalid"
+            payable:
+              required: "is required"
+            parent:
+              not_wrapper: "must be a wrapper entry"
+            amount:
+              insufficient_amount: "is less than the unpaid amount"
+              already_paid: "has already been paid"
+        payment_core/entries/wrapper:
+          attributes:
+            amount:
+              components_insufficient: "is not covered by succeeded components"
+        payment_core/payment_method:
+          attributes:
+            reference:
+              invalid_reference: "is invalid"
+            type:
+              invalid_reference_type: "does not match the reference type"
+        payment_core/payment_intent:
+          attributes:
+            type:
+              entry_type_not_allowed: "is not allowed for this payment intent"

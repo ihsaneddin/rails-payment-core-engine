@@ -7,7 +7,9 @@ module PaymentCore
 
     def perform(id, action, *args)
       self.id = id
+      callback(:before)
       send(action, *args)
+      callback(:after)
     end
 
     protected
@@ -23,6 +25,14 @@ module PaymentCore
 
       def model
         self.class.model
+      end
+
+      def callback(key, *args, config: ::PaymentCore.config.sidekiq.callbacks)
+        if config.exists?(key)
+          config.with_context(self) do
+            config.send(key, *args)
+          end
+        end
       end
   end
 end

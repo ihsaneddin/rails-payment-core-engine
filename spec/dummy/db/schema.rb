@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2025_07_20_183103) do
+ActiveRecord::Schema[7.0].define(version: 2026_01_27_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -78,6 +78,7 @@ ActiveRecord::Schema[7.0].define(version: 2025_07_20_183103) do
     t.bigint "currency_id"
     t.string "currency_name"
     t.string "hash_number"
+    t.string "txid"
     t.string "state"
     t.string "description"
     t.date "date"
@@ -273,8 +274,10 @@ ActiveRecord::Schema[7.0].define(version: 2025_07_20_183103) do
     t.datetime "updated_at", null: false
     t.index ["deleted_at"], name: "index_payment_core_entries_on_deleted_at"
     t.index ["idempotency_key"], name: "index_payment_core_entries_on_idempotency_key"
+    t.index ["number"], name: "index_payment_core_entries_on_number", unique: true, where: "(number IS NOT NULL)"
     t.index ["paid_at_type", "paid_at_id"], name: "index_payment_core_entries_on_paid_at_type_and_paid_at_id"
     t.index ["parent_id"], name: "index_payment_core_entries_on_parent_id"
+    t.index ["payable_transaction_id"], name: "index_payment_core_entries_on_payable_transaction_id", unique: true, where: "(payable_transaction_id IS NOT NULL)"
     t.index ["payable_type", "payable_id"], name: "index_payment_core_entries_on_payable_type_and_payable_id"
     t.index ["payer_type", "payer_id"], name: "index_payment_core_entries_on_payer_type_and_payer_id"
     t.index ["payment_intent_id"], name: "index_payment_core_entries_on_payment_intent_id"
