@@ -122,7 +122,8 @@ module PaymentCore
           vcode: vcode,
           currency: currency,
           returnurl: method_data_hash[:return_url],
-          callbackurl: method_data_hash[:callback_url] || method_data_hash[:notify_url]
+          callbackurl: method_data_hash[:callback_url],
+          notifyurl: method_data_hash[:notify_url]
         }.compact
         payload[:mp_extended_vcode] = 1 if use_extended
         [payload, { order_id: order_id, vcode: vcode }]
@@ -196,7 +197,7 @@ module PaymentCore
         paydate = params[:paydate] || params[:PayDate] || ""
         currency = params[:currency] || params[:Currency] || ""
         nbcb = params[:nbcb] || params[:NBCB]
-        return false unless nbcb.to_s == "2"
+        return false unless %w[1 2].include?(nbcb.to_s)
         required = [amount, tran_id, order_id, status, domain, paydate, currency]
         return false if required.any? { |value| value.blank? }
 
