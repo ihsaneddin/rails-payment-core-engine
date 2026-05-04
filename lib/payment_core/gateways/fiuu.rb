@@ -196,6 +196,8 @@ module PaymentCore
         appcode = params[:appcode] || params[:AppCode] || ""
         paydate = params[:paydate] || params[:PayDate] || ""
         currency = params[:currency] || params[:Currency] || ""
+        nbcb = params[:nbcb] || params[:NBCB]
+        return false unless %w[1 2].include?(nbcb.to_s)
         required = [amount, tran_id, order_id, status, domain, paydate, currency]
         return false if required.any? { |value| value.blank? }
 
