@@ -54,17 +54,6 @@ module PaymentCore
                 end
               end
 
-              entry_callback :after_create do |entry|
-                next unless require_intent? && (intent = entry.payment_intent) && intent.pending?
-
-                ttl = (intent.expires_at && intent.created_at) ? (intent.expires_at - intent.created_at) : nil
-                next unless ttl&.positive?
-
-                now = Time.current
-                intent.update_columns(expires_at: now + ttl, updated_at: now)
-                intent.schedule_for_expiration
-              end
-
               entry_callback :after_save do |entry|
                 if require_intent?
                   if entry.after_state_succeeded?
